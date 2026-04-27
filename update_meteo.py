@@ -63,11 +63,9 @@ VARIABLES_DAILY = [
     "relative_humidity_2m_mean", "relative_humidity_2m_max", "relative_humidity_2m_min",
     "dew_point_2m_mean",
 ]
-
-
 import time
 
-   def telecharger_periode(url, debut, fin, source_label):
+def telecharger_periode(url, debut, fin, source_label):
        """Télécharge une période depuis une API Open-Meteo, par tranches d'un an."""
        print(f"  Téléchargement {source_label} : {debut} → {fin}...")
        morceaux = []
