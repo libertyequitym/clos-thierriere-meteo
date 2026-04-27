@@ -9,8 +9,10 @@ permissions:
   contents: write
 
 jobs:
-  meteo:
-    runs-on: ubuntu-latest
+     meteo:
+       runs-on: ubuntu-latest
+       env:
+         FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     steps:
       - name: Récupérer le code
         uses: actions/checkout@v4
