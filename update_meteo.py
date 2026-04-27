@@ -169,23 +169,23 @@ df["Bilan_hydrique_cumul_mm"] = (df["Pluie_cumul_campagne_mm"] - df["ETP_cumul_c
 # -----------------------------------------------------------------------------
 # 5. SYNTHÈSE MENSUELLE
 # -----------------------------------------------------------------------------
-synthese_mens = df.groupby(["Année", "Mois"]).agg(
-    T_min_moy_°C=("T_min_°C", "mean"),
-    T_max_moy_°C=("T_max_°C", "mean"),
-    T_moy_°C=("T_moy_°C", "mean"),
-    Précipitations_mm=("Précipitations_mm", "sum"),
-    ETP_mm=("ETP_mm", "sum"),
-    Bilan_hydrique_mm=("Bilan_hydrique_mm", "sum"),
-    Insolation_h=("Insolation_h", "sum"),
-    Rayonnement_MJ_m2=("Rayonnement_global_MJ_m2", "sum"),
-    Vent_max_moy_kmh=("Vent_max_kmh", "mean"),
-    HR_moy_pct=("HR_moy_%", "mean"),
-    Jours_gel=("Jour_gel", "sum"),
-    Jours_gel_sévère=("Jour_gel_sévère", "sum"),
-    Jours_chauds_30=("Jour_chaud_30", "sum"),
-    Jours_chauds_35=("Jour_chaud_35", "sum"),
-    Jours_pluvieux=("Jour_pluvieux", "sum"),
-).round(1).reset_index()
+synthese_mens = df.groupby(["Année", "Mois"]).agg(**{
+       "T_min_moy_°C": ("T_min_°C", "mean"),
+       "T_max_moy_°C": ("T_max_°C", "mean"),
+       "T_moy_°C": ("T_moy_°C", "mean"),
+       "Précipitations_mm": ("Précipitations_mm", "sum"),
+       "ETP_mm": ("ETP_mm", "sum"),
+       "Bilan_hydrique_mm": ("Bilan_hydrique_mm", "sum"),
+       "Insolation_h": ("Insolation_h", "sum"),
+       "Rayonnement_MJ_m2": ("Rayonnement_global_MJ_m2", "sum"),
+       "Vent_max_moy_kmh": ("Vent_max_kmh", "mean"),
+       "HR_moy_pct": ("HR_moy_%", "mean"),
+       "Jours_gel": ("Jour_gel", "sum"),
+       "Jours_gel_sévère": ("Jour_gel_sévère", "sum"),
+       "Jours_chauds_30": ("Jour_chaud_30", "sum"),
+       "Jours_chauds_35": ("Jour_chaud_35", "sum"),
+       "Jours_pluvieux": ("Jour_pluvieux", "sum"),
+   }).round(1).reset_index()
 
 # -----------------------------------------------------------------------------
 # 6. SYNTHÈSE ANNUELLE / FICHE MILLÉSIME
