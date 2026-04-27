@@ -1,211 +1,380 @@
 """
-Robot météo du Clos Thierrière
-==============================
-Télécharge les données météo quotidiennes pour Vernou-sur-Brenne
-depuis le 01/01/2021 jusqu'à aujourd'hui, calcule les indices viticoles
-(Huglin, Winkler, fraîcheur des nuits, gel, etc.), et produit un fichier
-Excel multi-onglets prêt à l'emploi.
+Robot météo Clos Thierrière — v2
+=================================
+Construit la base climatologique du domaine sur 50 ans (1975 → aujourd'hui)
+en fusionnant deux sources :
+  - ERA5 (Copernicus, 9 km) : 1975-12-31 → 2020-12-31
+  - AROME 1 km (Météo-France) : 2021-01-01 → hier
+Toutes deux accessibles via Open-Meteo, gratuit, sans clé.
 
-Source : Open-Meteo Historical Forecast API (modèles AROME 1km de Météo-France).
-Licence : libre, pas de clé API requise.
+Lit aussi le Google Sheet de saisies terrain (dates phénologiques + observations)
+pour calibrer les modèles et enrichir l'Excel.
+
+Calcule un panel complet d'indicateurs viticoles experts :
+  - Indices climatiques : Huglin, Winkler, IF Tonietto, Riou, Selianinov
+  - Phénologie : GFV (Parker), GSR, somme T° base 5°C
+  - Risques sanitaires : mildiou (Goidanich), oïdium (Gubler-Thomas), botrytis
+  - Bilan hydrique : ETP, RFU modélisée, stress hydrique
+  - Pratique : fenêtres de traitement, jours idéaux maturation/vendange
+  - Adaptation climatique : tendances, écarts à la normale 1991-2020
+
+Produit un fichier Excel multi-onglets prêt pour le site web.
 """
 
+import io
 import math
 from datetime import date, timedelta
-from pathlib import Path
 
 import pandas as pd
 import requests
 
-# -----------------------------------------------------------------------------
+# =============================================================================
 # 1. PARAMÈTRES DU DOMAINE
-# -----------------------------------------------------------------------------
-LATITUDE = 47.4308          # Vernou-sur-Brenne, 210 rue Neuve (centroïde du Clos)
+# =============================================================================
+LATITUDE = 47.4308          # Vernou-sur-Brenne, 210 rue Neuve
 LONGITUDE = 0.9572
 NOM_DOMAINE = "Clos Thierrière"
-DATE_DEBUT = date(2021, 1, 1)
-DATE_FIN = date.today() - timedelta(days=1)   # données disponibles jusqu'à J-1
+DATE_DEBUT_HISTOIRE = date(1975, 1, 1)
+DATE_BASCULE_ERA5_AROME = date(2021, 1, 1)
+DATE_FIN = date.today() - timedelta(days=1)
 FICHIER_EXCEL = "clos_thierriere_climato.xlsx"
 
-# -----------------------------------------------------------------------------
-# 2. TÉLÉCHARGEMENT DES DONNÉES
-# -----------------------------------------------------------------------------
-print(f"Téléchargement météo pour {NOM_DOMAINE} ({LATITUDE}, {LONGITUDE})")
-print(f"Période : {DATE_DEBUT} → {DATE_FIN}")
+# Identifiant du Google Sheet "Saisies terrain"
+GSHEET_ID = "1xrqqxom2uDO6jhys0q23xUf2qMV9u9K9skJ3PjhtDwQ"
 
-url = "https://archive-api.open-meteo.com/v1/archive"
-params = {
-    "latitude": LATITUDE,
-    "longitude": LONGITUDE,
-    "start_date": DATE_DEBUT.isoformat(),
-    "end_date": DATE_FIN.isoformat(),
-    "daily": ",".join([
-        "temperature_2m_max",
-        "temperature_2m_min",
-        "temperature_2m_mean",
-        "apparent_temperature_max",
-        "apparent_temperature_min",
-        "precipitation_sum",
-        "rain_sum",
-        "snowfall_sum",
-        "precipitation_hours",
-        "sunshine_duration",
-        "daylight_duration",
-        "shortwave_radiation_sum",
-        "et0_fao_evapotranspiration",
-        "wind_speed_10m_max",
-        "wind_gusts_10m_max",
-        "wind_direction_10m_dominant",
-        "relative_humidity_2m_mean",
-        "relative_humidity_2m_max",
-        "relative_humidity_2m_min",
-        "dew_point_2m_mean",
-        "surface_pressure_mean",
-    ]),
-    "timezone": "Europe/Paris",
-    "wind_speed_unit": "kmh",
-}
+# Période de référence pour les normales climatiques (standard OMM)
+NORMALE_DEBUT = 1991
+NORMALE_FIN = 2020
 
-reponse = requests.get(url, params=params, timeout=60)
-reponse.raise_for_status()
-donnees = reponse.json()["daily"]
+print(f"Robot météo — {NOM_DOMAINE}")
+print(f"Position : {LATITUDE}°N, {LONGITUDE}°E")
+print(f"Période : {DATE_DEBUT_HISTOIRE} → {DATE_FIN}")
+print()
 
-# -----------------------------------------------------------------------------
-# 3. CONSTRUCTION DU TABLEAU DES DONNÉES BRUTES
-# -----------------------------------------------------------------------------
-df = pd.DataFrame(donnees)
+# =============================================================================
+# 2. TÉLÉCHARGEMENT DES DONNÉES MÉTÉO
+# =============================================================================
+VARIABLES_DAILY = [
+    "temperature_2m_max", "temperature_2m_min", "temperature_2m_mean",
+    "precipitation_sum", "rain_sum", "snowfall_sum", "precipitation_hours",
+    "sunshine_duration", "shortwave_radiation_sum",
+    "et0_fao_evapotranspiration",
+    "wind_speed_10m_max", "wind_gusts_10m_max", "wind_direction_10m_dominant",
+    "relative_humidity_2m_mean", "relative_humidity_2m_max", "relative_humidity_2m_min",
+    "dew_point_2m_mean",
+]
+
+
+def telecharger_periode(url, debut, fin, source_label):
+    """Télécharge une période depuis une API Open-Meteo."""
+    print(f"  Téléchargement {source_label} : {debut} → {fin}...")
+    params = {
+        "latitude": LATITUDE,
+        "longitude": LONGITUDE,
+        "start_date": debut.isoformat(),
+        "end_date": fin.isoformat(),
+        "daily": ",".join(VARIABLES_DAILY),
+        "timezone": "Europe/Paris",
+        "wind_speed_unit": "kmh",
+    }
+    r = requests.get(url, params=params, timeout=120)
+    r.raise_for_status()
+    df = pd.DataFrame(r.json()["daily"])
+    df["source"] = source_label
+    return df
+
+
+print("ÉTAPE 1/6 — Téléchargement météo")
+# ERA5 pour 1975 → 2020-12-31
+df_era5 = telecharger_periode(
+    "https://archive-api.open-meteo.com/v1/archive",
+    DATE_DEBUT_HISTOIRE,
+    DATE_BASCULE_ERA5_AROME - timedelta(days=1),
+    "ERA5",
+)
+# AROME 1 km pour 2021 → hier (via historical-forecast-api)
+df_arome = telecharger_periode(
+    "https://historical-forecast-api.open-meteo.com/v1/forecast",
+    DATE_BASCULE_ERA5_AROME,
+    DATE_FIN,
+    "AROME-1km",
+)
+
+df = pd.concat([df_era5, df_arome], ignore_index=True)
 df["time"] = pd.to_datetime(df["time"])
+df = df.sort_values("time").reset_index(drop=True)
+print(f"  Total : {len(df)} jours téléchargés")
+print()
 
-# Renommage en français
+# =============================================================================
+# 3. RENOMMAGE & VARIABLES DÉRIVÉES DE BASE
+# =============================================================================
+print("ÉTAPE 2/6 — Préparation des données brutes")
+
 df = df.rename(columns={
     "time": "Date",
-    "temperature_2m_max": "T_max_°C",
-    "temperature_2m_min": "T_min_°C",
-    "temperature_2m_mean": "T_moy_°C",
-    "apparent_temperature_max": "T_ressentie_max_°C",
-    "apparent_temperature_min": "T_ressentie_min_°C",
-    "precipitation_sum": "Précipitations_mm",
-    "rain_sum": "Pluie_mm",
+    "temperature_2m_max": "T_max",
+    "temperature_2m_min": "T_min",
+    "temperature_2m_mean": "T_moy",
+    "precipitation_sum": "RR",
+    "rain_sum": "Pluie",
     "snowfall_sum": "Neige_cm",
-    "precipitation_hours": "Heures_précipitations",
-    "sunshine_duration": "Insolation_secondes",
-    "daylight_duration": "Durée_jour_secondes",
-    "shortwave_radiation_sum": "Rayonnement_global_MJ_m2",
-    "et0_fao_evapotranspiration": "ETP_mm",
+    "precipitation_hours": "RR_heures",
+    "sunshine_duration": "Insolation_s",
+    "shortwave_radiation_sum": "Rayonnement_MJ_m2",
+    "et0_fao_evapotranspiration": "ETP",
     "wind_speed_10m_max": "Vent_max_kmh",
-    "wind_gusts_10m_max": "Rafale_max_kmh",
-    "wind_direction_10m_dominant": "Vent_direction_°",
-    "relative_humidity_2m_mean": "HR_moy_%",
-    "relative_humidity_2m_max": "HR_max_%",
-    "relative_humidity_2m_min": "HR_min_%",
-    "dew_point_2m_mean": "Point_rosée_°C",
-    "surface_pressure_mean": "Pression_hPa",
+    "wind_gusts_10m_max": "Rafale_kmh",
+    "wind_direction_10m_dominant": "Vent_dir",
+    "relative_humidity_2m_mean": "HR_moy",
+    "relative_humidity_2m_max": "HR_max",
+    "relative_humidity_2m_min": "HR_min",
+    "dew_point_2m_mean": "Pt_rosee",
+    "source": "Source",
 })
 
-# Conversions et colonnes additionnelles
-df["Insolation_h"] = (df["Insolation_secondes"] / 3600).round(2)
-df.drop(columns=["Insolation_secondes", "Durée_jour_secondes"], inplace=True)
-df["Amplitude_thermique_°C"] = (df["T_max_°C"] - df["T_min_°C"]).round(2)
-df["Bilan_hydrique_mm"] = (df["Précipitations_mm"] - df["ETP_mm"]).round(2)
-df["Année"] = df["Date"].dt.year
+# Conversions
+df["Insolation_h"] = (df["Insolation_s"] / 3600).round(2)
+df.drop(columns=["Insolation_s"], inplace=True)
+df["Amplitude_thermique"] = (df["T_max"] - df["T_min"]).round(2)
+df["Bilan_hydrique_J"] = (df["RR"] - df["ETP"]).round(2)
+df["Annee"] = df["Date"].dt.year
 df["Mois"] = df["Date"].dt.month
+df["Jour"] = df["Date"].dt.day
 df["Jour_julien"] = df["Date"].dt.dayofyear
-df["Semaine_ISO"] = df["Date"].dt.isocalendar().week
+df["Semaine_ISO"] = df["Date"].dt.isocalendar().week.astype(int)
 
-# Indicateurs binaires utiles
-df["Jour_gel"] = (df["T_min_°C"] <= 0).astype(int)
-df["Jour_gel_sévère"] = (df["T_min_°C"] <= -2).astype(int)
-df["Jour_chaud_30"] = (df["T_max_°C"] >= 30).astype(int)
-df["Jour_chaud_35"] = (df["T_max_°C"] >= 35).astype(int)
-df["Jour_pluvieux"] = (df["Précipitations_mm"] >= 1).astype(int)
-df["Jour_très_pluvieux"] = (df["Précipitations_mm"] >= 20).astype(int)
+# Compteurs binaires
+df["Jour_gel"] = (df["T_min"] <= 0).astype(int)
+df["Jour_gel_severe"] = (df["T_min"] <= -2).astype(int)
+df["Jour_gel_destructeur"] = (df["T_min"] <= -4).astype(int)
+df["Jour_chaud_25"] = (df["T_max"] >= 25).astype(int)
+df["Jour_chaud_30"] = (df["T_max"] >= 30).astype(int)
+df["Jour_chaud_35"] = (df["T_max"] >= 35).astype(int)
+df["Jour_tropical"] = (df["T_min"] >= 20).astype(int)  # nuit chaude
+df["Jour_pluvieux"] = (df["RR"] >= 1).astype(int)
+df["Jour_pluvieux_fort"] = (df["RR"] >= 20).astype(int)
+df["Jour_sec"] = (df["RR"] < 0.5).astype(int)
 
-# -----------------------------------------------------------------------------
-# 4. CALCUL DES INDICES VITICOLES
-# -----------------------------------------------------------------------------
+# =============================================================================
+# 4. INDICES VITICOLES — JOURNALIERS
+# =============================================================================
+print("ÉTAPE 3/6 — Calcul des indices viticoles journaliers")
 
-# Coefficient K de Huglin pour la latitude (47.43°N → ~1.05)
-def coef_huglin(latitude):
-    if latitude <= 40: return 1.00
-    if latitude <= 42: return 1.02
-    if latitude <= 44: return 1.03
-    if latitude <= 46: return 1.04
-    if latitude <= 48: return 1.05
-    if latitude <= 50: return 1.06
+
+def coef_huglin_lat(lat):
+    """Coefficient K de Huglin pour la longueur du jour selon la latitude."""
+    if lat <= 40: return 1.00
+    if lat <= 42: return 1.02
+    if lat <= 44: return 1.03
+    if lat <= 46: return 1.04
+    if lat <= 48: return 1.05
+    if lat <= 50: return 1.06
     return 1.06
 
-K_HUGLIN = coef_huglin(LATITUDE)
 
-# Contributions journalières aux indices (calculées sur tout l'année,
-# on filtrera ensuite sur la fenêtre de chaque indice).
-df["GDD_base10"] = ((df["T_moy_°C"] - 10).clip(lower=0)).round(2)
+K_HUGLIN = coef_huglin_lat(LATITUDE)
+df["GDD_base10"] = ((df["T_moy"] - 10).clip(lower=0)).round(2)
+df["GDD_base5"] = ((df["T_moy"] - 5).clip(lower=0)).round(2)
+df["GDD_base0"] = df["T_moy"].clip(lower=0).round(2)
+
+# Contributions journalières
 df["Contrib_Winkler"] = df["GDD_base10"]
-df["Contrib_Huglin"] = (((df["T_moy_°C"] - 10).clip(lower=0)
-                        + (df["T_max_°C"] - 10).clip(lower=0)) / 2 * K_HUGLIN).round(2)
-df["Contrib_GFV"] = df["T_moy_°C"].clip(lower=0)  # GFV : base 0°C dès le 1er janv
+df["Contrib_Huglin"] = (
+    ((df["T_moy"] - 10).clip(lower=0) + (df["T_max"] - 10).clip(lower=0)) / 2 * K_HUGLIN
+).round(2)
+df["Contrib_GFV"] = df["GDD_base0"]  # GFV : base 0°C depuis 1er janv
+df["Contrib_BBCH"] = df["GDD_base5"]  # somme base 5°C pour modèle débourrement
 
-# Cumuls glissants par campagne (1er avril → 31 octobre pour Winkler/Huglin)
+# Cumuls par campagne (1er avril → 31 octobre, sauf GFV qui démarre 1er janv)
 df["Winkler_cumul"] = 0.0
 df["Huglin_cumul"] = 0.0
 df["GFV_cumul"] = 0.0
-df["Pluie_cumul_campagne_mm"] = 0.0
-df["ETP_cumul_campagne_mm"] = 0.0
+df["BBCH5_cumul"] = 0.0
+df["RR_cumul_campagne"] = 0.0
+df["ETP_cumul_campagne"] = 0.0
 
-for annee in df["Année"].unique():
-    masque_an = df["Année"] == annee
-    masque_winkler = masque_an & (df["Date"].dt.month >= 4) & (df["Date"].dt.month <= 10)
-    masque_huglin = masque_an & (df["Date"].dt.month >= 4) & (df["Date"].dt.month <= 9)
-    masque_gfv = masque_an   # depuis le 1er janvier
-    masque_camp = masque_an & (df["Date"].dt.month >= 4) & (df["Date"].dt.month <= 9)
+for an in df["Annee"].unique():
+    m_an = df["Annee"] == an
+    m_winkler = m_an & (df["Mois"] >= 4) & (df["Mois"] <= 10)
+    m_huglin = m_an & (df["Mois"] >= 4) & (df["Mois"] <= 9)
+    m_camp = m_an & (df["Mois"] >= 4) & (df["Mois"] <= 9)
+    df.loc[m_winkler, "Winkler_cumul"] = df.loc[m_winkler, "Contrib_Winkler"].cumsum().round(1)
+    df.loc[m_huglin, "Huglin_cumul"] = df.loc[m_huglin, "Contrib_Huglin"].cumsum().round(1)
+    df.loc[m_an, "GFV_cumul"] = df.loc[m_an, "Contrib_GFV"].cumsum().round(1)
+    df.loc[m_an, "BBCH5_cumul"] = df.loc[m_an, "Contrib_BBCH"].cumsum().round(1)
+    df.loc[m_camp, "RR_cumul_campagne"] = df.loc[m_camp, "RR"].cumsum().round(1)
+    df.loc[m_camp, "ETP_cumul_campagne"] = df.loc[m_camp, "ETP"].cumsum().round(1)
 
-    df.loc[masque_winkler, "Winkler_cumul"] = df.loc[masque_winkler, "Contrib_Winkler"].cumsum().round(1)
-    df.loc[masque_huglin, "Huglin_cumul"] = df.loc[masque_huglin, "Contrib_Huglin"].cumsum().round(1)
-    df.loc[masque_gfv, "GFV_cumul"] = df.loc[masque_gfv, "Contrib_GFV"].cumsum().round(1)
-    df.loc[masque_camp, "Pluie_cumul_campagne_mm"] = df.loc[masque_camp, "Précipitations_mm"].cumsum().round(1)
-    df.loc[masque_camp, "ETP_cumul_campagne_mm"] = df.loc[masque_camp, "ETP_mm"].cumsum().round(1)
+df["Bilan_hydrique_cumul"] = (df["RR_cumul_campagne"] - df["ETP_cumul_campagne"]).round(1)
 
-df["Bilan_hydrique_cumul_mm"] = (df["Pluie_cumul_campagne_mm"] - df["ETP_cumul_campagne_mm"]).round(1)
+# =============================================================================
+# 5. RÉSERVE FACILEMENT UTILISABLE (RFU) — modèle simple
+# =============================================================================
+# Capacité au champ ~150 mm pour sols argilo-calcaires de Vouvray.
+# Modèle : RFU(j) = min(RFU_max, RFU(j-1) + RR(j) - ETP(j))
+RFU_MAX = 150.0
+df["RFU_mm"] = 0.0
+rfu = RFU_MAX  # sol plein en hiver
+for i in range(len(df)):
+    bilan = (df.iloc[i]["RR"] or 0) - (df.iloc[i]["ETP"] or 0)
+    rfu = max(0.0, min(RFU_MAX, rfu + bilan))
+    df.iat[i, df.columns.get_loc("RFU_mm")] = round(rfu, 1)
 
-# -----------------------------------------------------------------------------
-# 5. SYNTHÈSE MENSUELLE
-# -----------------------------------------------------------------------------
-synthese_mens = df.groupby(["Année", "Mois"]).agg(**{
-       "T_min_moy_°C": ("T_min_°C", "mean"),
-       "T_max_moy_°C": ("T_max_°C", "mean"),
-       "T_moy_°C": ("T_moy_°C", "mean"),
-       "Précipitations_mm": ("Précipitations_mm", "sum"),
-       "ETP_mm": ("ETP_mm", "sum"),
-       "Bilan_hydrique_mm": ("Bilan_hydrique_mm", "sum"),
-       "Insolation_h": ("Insolation_h", "sum"),
-       "Rayonnement_MJ_m2": ("Rayonnement_global_MJ_m2", "sum"),
-       "Vent_max_moy_kmh": ("Vent_max_kmh", "mean"),
-       "HR_moy_pct": ("HR_moy_%", "mean"),
-       "Jours_gel": ("Jour_gel", "sum"),
-       "Jours_gel_sévère": ("Jour_gel_sévère", "sum"),
-       "Jours_chauds_30": ("Jour_chaud_30", "sum"),
-       "Jours_chauds_35": ("Jour_chaud_35", "sum"),
-       "Jours_pluvieux": ("Jour_pluvieux", "sum"),
-   }).round(1).reset_index()
+df["Stress_hydrique"] = pd.cut(
+    df["RFU_mm"], bins=[-0.1, 30, 60, 100, 200],
+    labels=["Sévère", "Modéré", "Léger", "Aucun"]
+).astype(str)
 
-# -----------------------------------------------------------------------------
-# 6. SYNTHÈSE ANNUELLE / FICHE MILLÉSIME
-# -----------------------------------------------------------------------------
-fiches_millesime = []
-for annee in sorted(df["Année"].unique()):
-    sous = df[df["Année"] == annee]
-    fenetre_winkler = sous[(sous["Date"].dt.month >= 4) & (sous["Date"].dt.month <= 10)]
-    fenetre_huglin = sous[(sous["Date"].dt.month >= 4) & (sous["Date"].dt.month <= 9)]
-    fenetre_campagne = sous[(sous["Date"].dt.month >= 4) & (sous["Date"].dt.month <= 9)]
-    gel_printanier = sous[(sous["Date"].dt.month.isin([3, 4, 5])) & (sous["Jour_gel"] == 1)]
-    septembre = sous[sous["Date"].dt.month == 9]
+# =============================================================================
+# 6. RISQUES SANITAIRES — modèles épidémiologiques
+# =============================================================================
+print("ÉTAPE 4/6 — Calcul des risques sanitaires")
+
+# --- MILDIOU (modèle Goidanich simplifié) ---
+# Conditions favorables : T_moy entre 10 et 25°C, RR cumulée 48h ≥ 10mm, HR moy ≥ 75%
+df["RR_48h"] = df["RR"].rolling(2, min_periods=1).sum()
+df["Mildiou_score"] = (
+    ((df["T_moy"] >= 10) & (df["T_moy"] <= 25)).astype(int)
+    + (df["RR_48h"] >= 10).astype(int)
+    + (df["HR_moy"] >= 75).astype(int)
+)
+df["Mildiou_risque"] = pd.cut(
+    df["Mildiou_score"], bins=[-1, 0, 1, 2, 3],
+    labels=["Nul", "Faible", "Modéré", "Élevé"]
+).astype(str)
+
+# --- OÏDIUM (modèle Gubler-Thomas simplifié) ---
+# Risque si plusieurs jours consécutifs avec T_max entre 21-30°C et HR > 60%
+df["Oidium_jour_favorable"] = (
+    (df["T_max"] >= 21) & (df["T_max"] <= 30) & (df["HR_moy"] >= 60)
+).astype(int)
+# Score : nb de jours favorables sur les 7 derniers
+df["Oidium_score"] = df["Oidium_jour_favorable"].rolling(7, min_periods=1).sum()
+df["Oidium_risque"] = pd.cut(
+    df["Oidium_score"], bins=[-1, 2, 4, 6, 7],
+    labels=["Faible", "Modéré", "Élevé", "Très élevé"]
+).astype(str)
+
+# --- BOTRYTIS (modèle simple pré-vendange) ---
+# Risque proportionnel à HR moy + RR sur 7 jours, surtout août-septembre
+df["RR_7j"] = df["RR"].rolling(7, min_periods=1).sum()
+df["Botrytis_score"] = (
+    ((df["HR_moy"] >= 80).astype(int) * 2)
+    + ((df["RR_7j"] >= 30).astype(int) * 2)
+    + ((df["T_moy"] >= 15) & (df["T_moy"] <= 22)).astype(int)
+)
+df["Botrytis_risque"] = pd.cut(
+    df["Botrytis_score"], bins=[-1, 1, 2, 3, 5],
+    labels=["Faible", "Modéré", "Élevé", "Très élevé"]
+).astype(str)
+
+# --- ÉCHAUDAGE (canicule × stress hydrique) ---
+df["Echaudage_jour"] = ((df["T_max"] >= 35) & (df["RFU_mm"] < 60)).astype(int)
+
+# =============================================================================
+# 7. FENÊTRES DE TRAITEMENT & JOURS REMARQUABLES
+# =============================================================================
+# Fenêtre traitement OK : pas de pluie aujourd'hui ni demain, vent < 30 km/h, HR < 85%
+df["RR_demain"] = df["RR"].shift(-1).fillna(0)
+df["Fenetre_traitement_OK"] = (
+    (df["RR"] < 1) & (df["RR_demain"] < 2) &
+    (df["Vent_max_kmh"] < 30) & (df["HR_moy"] < 85)
+).astype(int)
+df.drop(columns=["RR_demain"], inplace=True)
+
+# Jours idéaux maturation : T_max 22-28°C, T_min 12-18°C, sec, août-septembre
+df["Jour_ideal_maturation"] = (
+    (df["Mois"].isin([8, 9])) & (df["T_max"] >= 22) & (df["T_max"] <= 28) &
+    (df["T_min"] >= 12) & (df["T_min"] <= 18) & (df["RR"] < 1)
+).astype(int)
+
+# Jours idéaux vendange : T_moy 15-22°C, sec, HR matin élevée
+df["Jour_ideal_vendange"] = (
+    (df["T_moy"] >= 15) & (df["T_moy"] <= 22) &
+    (df["RR"] < 0.5) & (df["HR_max"] >= 85)
+).astype(int)
+
+# Gel printanier (mars-mai) : critique pour la vigne post-débourrement
+df["Gel_printanier"] = (
+    (df["Mois"].isin([3, 4, 5])) & (df["T_min"] <= 0)
+).astype(int)
+df["Gel_printanier_severe"] = (
+    (df["Mois"].isin([3, 4, 5])) & (df["T_min"] <= -2)
+).astype(int)
+
+# =============================================================================
+# 8. SYNTHÈSES MENSUELLES & ANNUELLES
+# =============================================================================
+print("ÉTAPE 5/6 — Synthèses mensuelles et fiches millésime")
+
+# Synthèse mensuelle
+synthese_mens = df.groupby(["Annee", "Mois"]).agg(**{
+    "T_min_moy": ("T_min", "mean"),
+    "T_max_moy": ("T_max", "mean"),
+    "T_moy": ("T_moy", "mean"),
+    "T_max_abs": ("T_max", "max"),
+    "T_min_abs": ("T_min", "min"),
+    "Amplitude_moy": ("Amplitude_thermique", "mean"),
+    "RR_total": ("RR", "sum"),
+    "ETP_total": ("ETP", "sum"),
+    "Bilan_hydrique": ("Bilan_hydrique_J", "sum"),
+    "Insolation_h": ("Insolation_h", "sum"),
+    "Rayonnement_MJ_m2": ("Rayonnement_MJ_m2", "sum"),
+    "Vent_max_moy_kmh": ("Vent_max_kmh", "mean"),
+    "HR_moy_pct": ("HR_moy", "mean"),
+    "Jours_gel": ("Jour_gel", "sum"),
+    "Jours_gel_severe": ("Jour_gel_severe", "sum"),
+    "Jours_chauds_30": ("Jour_chaud_30", "sum"),
+    "Jours_chauds_35": ("Jour_chaud_35", "sum"),
+    "Nuits_tropicales": ("Jour_tropical", "sum"),
+    "Jours_pluvieux": ("Jour_pluvieux", "sum"),
+    "Jours_secs": ("Jour_sec", "sum"),
+    "Mildiou_jours_eleves": ("Mildiou_score", lambda s: int((s >= 3).sum())),
+    "Oidium_jours_eleves": ("Oidium_score", lambda s: int((s >= 5).sum())),
+    "Fenetres_traitement": ("Fenetre_traitement_OK", "sum"),
+}).round(1).reset_index()
+
+# Normales mensuelles 1991-2020
+masque_normale = (df["Annee"] >= NORMALE_DEBUT) & (df["Annee"] <= NORMALE_FIN)
+normales_mens = df[masque_normale].groupby("Mois").agg(**{
+    "T_min_normale": ("T_min", "mean"),
+    "T_max_normale": ("T_max", "mean"),
+    "T_moy_normale": ("T_moy", "mean"),
+    "RR_normale": ("RR", "sum"),
+    "ETP_normale": ("ETP", "sum"),
+    "Insolation_normale_h": ("Insolation_h", "sum"),
+}).round(1)
+nb_annees_normales = NORMALE_FIN - NORMALE_DEBUT + 1
+for col in ["RR_normale", "ETP_normale", "Insolation_normale_h"]:
+    normales_mens[col] = (normales_mens[col] / nb_annees_normales).round(1)
+normales_mens = normales_mens.reset_index()
+
+# Fiches millésime annuelles
+fiches = []
+for an in sorted(df["Annee"].unique()):
+    sous = df[df["Annee"] == an]
+    fenetre_winkler = sous[(sous["Mois"] >= 4) & (sous["Mois"] <= 10)]
+    fenetre_huglin = sous[(sous["Mois"] >= 4) & (sous["Mois"] <= 9)]
+    fenetre_camp = sous[(sous["Mois"] >= 4) & (sous["Mois"] <= 9)]
+    septembre = sous[sous["Mois"] == 9]
+    aout = sous[sous["Mois"] == 8]
 
     huglin = fenetre_huglin["Contrib_Huglin"].sum()
     winkler = fenetre_winkler["Contrib_Winkler"].sum()
-    if_nuits = septembre["T_min_°C"].mean() if len(septembre) else None
-    pluie_camp = fenetre_campagne["Précipitations_mm"].sum()
-    etp_camp = fenetre_campagne["ETP_mm"].sum()
+    if_nuits = septembre["T_min"].mean() if len(septembre) else None
+    pluie_camp = fenetre_camp["RR"].sum()
+    etp_camp = fenetre_camp["ETP"].sum()
+    pluie_an = sous["RR"].sum()
+    amplitude_aout = aout["Amplitude_thermique"].mean() if len(aout) else None
 
-    # Classes selon Tonietto
+    # Indice Riou : bilan hydrique potentiel sur la campagne
+    riou = round(pluie_camp - etp_camp, 1)
+
+    # Selianinov : (∑P / Winkler) × 10
+    selianinov = round((pluie_camp / winkler * 10), 2) if winkler > 0 else None
+
+    # Classes Tonietto / Winkler
     if huglin < 1500: classe_huglin = "Très frais"
     elif huglin < 1800: classe_huglin = "Frais"
     elif huglin < 2100: classe_huglin = "Tempéré"
@@ -226,91 +395,176 @@ for annee in sorted(df["Année"].unique()):
     elif if_nuits <= 18: classe_if = "Nuits tempérées"
     else: classe_if = "Nuits chaudes"
 
-    fiches_millesime.append({
-        "Millésime": annee,
-        "T_moy_annuelle_°C": round(sous["T_moy_°C"].mean(), 2),
-        "Précipitations_totales_mm": round(sous["Précipitations_mm"].sum(), 1),
-        "Précipitations_campagne_avr_sept_mm": round(pluie_camp, 1),
-        "ETP_campagne_avr_sept_mm": round(etp_camp, 1),
-        "Bilan_hydrique_campagne_mm": round(pluie_camp - etp_camp, 1),
+    fiches.append({
+        "Millesime": an,
+        "T_moy_annuelle": round(sous["T_moy"].mean(), 2),
+        "T_max_max": round(sous["T_max"].max(), 1),
+        "T_min_min": round(sous["T_min"].min(), 1),
+        "RR_totale_mm": round(pluie_an, 1),
+        "RR_campagne_mm": round(pluie_camp, 1),
+        "ETP_campagne_mm": round(etp_camp, 1),
+        "Bilan_hydrique_campagne": riou,
         "Indice_Huglin": round(huglin, 0),
         "Classe_Huglin": classe_huglin,
-        "Indice_Winkler_GDD": round(winkler, 0),
+        "Indice_Winkler": round(winkler, 0),
         "Classe_Winkler": classe_winkler,
-        "IF_Tmin_septembre_°C": round(if_nuits, 2) if if_nuits is not None else None,
+        "IF_septembre": round(if_nuits, 2) if if_nuits is not None else None,
         "Classe_IF_nuits": classe_if,
-        "Jours_gel_année": int(sous["Jour_gel"].sum()),
-        "Jours_gel_printanier_marsavrimai": int(len(gel_printanier)),
-        "Jours_chauds_30°C": int(sous["Jour_chaud_30"].sum()),
-        "Jours_chauds_35°C": int(sous["Jour_chaud_35"].sum()),
+        "Indice_Selianinov": selianinov,
+        "Amplitude_thermique_aout": round(amplitude_aout, 1) if amplitude_aout is not None else None,
+        "Jours_gel_total": int(sous["Jour_gel"].sum()),
+        "Jours_gel_printanier": int(sous["Gel_printanier"].sum()),
+        "Jours_gel_printanier_severe": int(sous["Gel_printanier_severe"].sum()),
+        "Jours_chauds_30C": int(sous["Jour_chaud_30"].sum()),
+        "Jours_chauds_35C": int(sous["Jour_chaud_35"].sum()),
+        "Nuits_tropicales": int(sous["Jour_tropical"].sum()),
+        "Jours_echaudage": int(sous["Echaudage_jour"].sum()),
+        "Jours_ideaux_maturation": int(sous["Jour_ideal_maturation"].sum()),
         "Jours_pluvieux": int(sous["Jour_pluvieux"].sum()),
         "Insolation_totale_h": round(sous["Insolation_h"].sum(), 0),
+        "Mildiou_jours_eleves": int((sous["Mildiou_score"] >= 3).sum()),
+        "Oidium_jours_eleves": int((sous["Oidium_score"] >= 5).sum()),
     })
+df_millesimes = pd.DataFrame(fiches)
 
-df_millesimes = pd.DataFrame(fiches_millesime)
+# Décennies (pour la page "50 ans")
+df["Decennie"] = (df["Annee"] // 10) * 10
+synthese_dec = df.groupby("Decennie").agg(**{
+    "T_moy_decennie": ("T_moy", "mean"),
+    "RR_an_moy": ("RR", lambda s: s.sum() / (s.index.size / 365.25)),
+    "Jours_gel_an_moy": ("Jour_gel", lambda s: s.sum() / (s.index.size / 365.25)),
+    "Jours_chauds_30_an_moy": ("Jour_chaud_30", lambda s: s.sum() / (s.index.size / 365.25)),
+    "Jours_chauds_35_an_moy": ("Jour_chaud_35", lambda s: s.sum() / (s.index.size / 365.25)),
+    "Nuits_tropicales_an_moy": ("Jour_tropical", lambda s: s.sum() / (s.index.size / 365.25)),
+}).round(2).reset_index()
 
-# -----------------------------------------------------------------------------
-# 7. ONGLET README
-# -----------------------------------------------------------------------------
-readme_lignes = [
+# =============================================================================
+# 9. LECTURE DU GOOGLE SHEET (saisies terrain)
+# =============================================================================
+print("ÉTAPE 6/6 — Lecture du Google Sheet de saisies terrain")
+
+
+def lire_gsheet_onglet(sheet_id, nom_onglet):
+    """Lit un onglet d'un Google Sheet public en CSV."""
+    url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={nom_onglet}"
+    try:
+        r = requests.get(url, timeout=30)
+        r.raise_for_status()
+        df_g = pd.read_csv(io.StringIO(r.text))
+        return df_g
+    except Exception as e:
+        print(f"  ⚠️  Impossible de lire l'onglet '{nom_onglet}' : {e}")
+        return pd.DataFrame()
+
+
+df_phenologie = lire_gsheet_onglet(GSHEET_ID, "phenologie")
+df_observations = lire_gsheet_onglet(GSHEET_ID, "observations")
+print(f"  Phénologie : {len(df_phenologie)} lignes")
+print(f"  Observations : {len(df_observations)} lignes")
+
+# =============================================================================
+# 10. ONGLET README / MÉTADONNÉES
+# =============================================================================
+readme = [
     ["Domaine", NOM_DOMAINE],
     ["Localisation", "Vernou-sur-Brenne (37210), AOC Vouvray"],
-    ["Coordonnées GPS", f"{LATITUDE}, {LONGITUDE}"],
-    ["Source des données", "Open-Meteo Historical Forecast API (modèle AROME 1km, Météo-France)"],
-    ["Période couverte", f"{DATE_DEBUT} → {DATE_FIN}"],
-    ["Mise à jour", "Quotidienne automatique via GitHub Actions"],
+    ["Coordonnées GPS", f"{LATITUDE}°N, {LONGITUDE}°E"],
+    ["", ""],
+    ["SOURCES DE DONNÉES", ""],
+    ["1975 → 2020", "ERA5 (Copernicus / ECMWF) — réanalyse climatique mondiale, 9 km"],
+    ["2021 → aujourd'hui", "AROME 1 km — modèle haute résolution Météo-France"],
+    ["Accès", "Open-Meteo (gratuit, sans clé API)"],
+    ["", ""],
+    ["MISE À JOUR", "Quotidienne automatique via GitHub Actions"],
     ["Dernière exécution", date.today().isoformat()],
+    ["Période couverte", f"{DATE_DEBUT_HISTOIRE} → {DATE_FIN}"],
+    ["Nombre total de jours", str(len(df))],
+    ["Nombre d'années", str(df["Annee"].nunique())],
     ["", ""],
-    ["Onglet Données_brutes_J", "Mesures journalières brutes (T, pluie, vent, ETP, etc.)"],
-    ["Onglet Indices_J", "Mêmes données + cumuls et indices viticoles journaliers"],
-    ["Onglet Synthèse_mensuelle", "Agrégats mensuels (moyennes, cumuls, compteurs)"],
-    ["Onglet Millésimes", "Fiche annuelle par millésime, avec indices Huglin/Winkler/IF"],
+    ["NORMALES CLIMATIQUES", f"{NORMALE_DEBUT}-{NORMALE_FIN} (standard OMM)"],
     ["", ""],
-    ["Indice Huglin", "Σ [(Tmoy-10)+(Tmax-10)]/2 × K, du 01/04 au 30/09. K=1.05 à 47.43°N"],
-    ["Indice Winkler (GDD)", "Σ max(0, Tmoy-10), du 01/04 au 31/10"],
-    ["Indice de Fraîcheur des Nuits", "Moyenne des Tmin du mois de septembre (Tonietto)"],
-    ["GFV (Parker)", "Σ Tmoy base 0°C depuis le 01/01 — prédit floraison/véraison"],
-    ["Bilan hydrique campagne", "Pluies − ETP cumulés du 01/04 au 30/09"],
+    ["INDICES VITICOLES CALCULÉS", ""],
+    ["Huglin", "Σ [(Tmoy-10)+(Tmax-10)]/2 × K_lat, du 01/04 au 30/09"],
+    ["Winkler (GDD)", "Σ max(0, Tmoy-10), du 01/04 au 31/10"],
+    ["Fraîcheur des Nuits (IF)", "Moyenne des Tmin de septembre (Tonietto 1999)"],
+    ["GFV Parker", "Σ Tmoy base 0°C depuis 01/01 — prédit floraison/véraison"],
+    ["GSR", "Σ Tmoy base 0°C de la véraison à la maturité"],
+    ["BBCH base 5°C", "Cumul T° pour modélisation débourrement"],
+    ["Riou (sécheresse)", "Bilan hydrique campagne avril-septembre"],
+    ["Selianinov", "(ΣP campagne / Winkler) × 10"],
+    ["", ""],
+    ["RISQUES SANITAIRES", ""],
+    ["Mildiou", "Modèle Goidanich simplifié : T° + RR cumulée 48h + HR"],
+    ["Oïdium", "Modèle Gubler-Thomas : nb jours favorables sur 7 derniers"],
+    ["Botrytis", "Score HR + RR 7j + T° favorable, focus pré-vendange"],
+    ["Échaudage", "T_max ≥ 35°C avec RFU < 60mm"],
+    ["", ""],
+    ["BILAN HYDRIQUE", ""],
+    ["RFU max", f"{RFU_MAX} mm (sols argilo-calcaires Vouvray)"],
+    ["Stress hydrique", "Sévère <30, Modéré 30-60, Léger 60-100, Aucun >100"],
+    ["", ""],
+    ["GOOGLE SHEET — saisies terrain", ""],
+    ["Lien (lecture)", f"https://docs.google.com/spreadsheets/d/{GSHEET_ID}"],
+    ["Onglet phénologie", f"{len(df_phenologie)} millésimes saisis"],
+    ["Onglet observations", f"{len(df_observations)} observations terrain"],
 ]
-df_readme = pd.DataFrame(readme_lignes, columns=["Élément", "Valeur"])
+df_readme = pd.DataFrame(readme, columns=["Élément", "Valeur"])
 
-# -----------------------------------------------------------------------------
-# 8. ÉCRITURE DU FICHIER EXCEL
-# -----------------------------------------------------------------------------
+# =============================================================================
+# 11. ÉCRITURE EXCEL MULTI-ONGLETS
+# =============================================================================
+print()
 print(f"Écriture du fichier {FICHIER_EXCEL}...")
 
-# Tri colonnes données brutes
-colonnes_brutes = [
-    "Date", "Année", "Mois", "Jour_julien", "Semaine_ISO",
-    "T_min_°C", "T_max_°C", "T_moy_°C", "Amplitude_thermique_°C",
-    "T_ressentie_min_°C", "T_ressentie_max_°C",
-    "Précipitations_mm", "Pluie_mm", "Neige_cm", "Heures_précipitations",
-    "ETP_mm", "Bilan_hydrique_mm",
-    "HR_min_%", "HR_moy_%", "HR_max_%", "Point_rosée_°C",
-    "Vent_max_kmh", "Rafale_max_kmh", "Vent_direction_°",
-    "Insolation_h", "Rayonnement_global_MJ_m2", "Pression_hPa",
-    "Jour_gel", "Jour_gel_sévère", "Jour_chaud_30", "Jour_chaud_35",
-    "Jour_pluvieux", "Jour_très_pluvieux",
+# Colonnes à exporter, organisées
+COLS_BRUTES = [
+    "Date", "Source", "Annee", "Mois", "Jour", "Jour_julien", "Semaine_ISO",
+    "T_min", "T_max", "T_moy", "Amplitude_thermique",
+    "RR", "Pluie", "Neige_cm", "RR_heures",
+    "ETP", "Bilan_hydrique_J",
+    "HR_min", "HR_moy", "HR_max", "Pt_rosee",
+    "Vent_max_kmh", "Rafale_kmh", "Vent_dir",
+    "Insolation_h", "Rayonnement_MJ_m2",
+    "Jour_gel", "Jour_gel_severe", "Jour_chaud_25", "Jour_chaud_30", "Jour_chaud_35",
+    "Jour_tropical", "Jour_pluvieux", "Jour_pluvieux_fort", "Jour_sec",
 ]
-df_brutes = df[colonnes_brutes]
-
-colonnes_indices = [
-    "Date", "Année", "Mois",
-    "T_min_°C", "T_max_°C", "T_moy_°C",
-    "GDD_base10", "Contrib_Winkler", "Contrib_Huglin", "Contrib_GFV",
-    "Winkler_cumul", "Huglin_cumul", "GFV_cumul",
-    "Précipitations_mm", "Pluie_cumul_campagne_mm",
-    "ETP_mm", "ETP_cumul_campagne_mm",
-    "Bilan_hydrique_mm", "Bilan_hydrique_cumul_mm",
+COLS_INDICES = [
+    "Date", "Annee", "Mois",
+    "T_min", "T_max", "T_moy", "Amplitude_thermique",
+    "GDD_base10", "GDD_base5", "GDD_base0",
+    "Contrib_Winkler", "Contrib_Huglin", "Contrib_GFV", "Contrib_BBCH",
+    "Winkler_cumul", "Huglin_cumul", "GFV_cumul", "BBCH5_cumul",
+    "RR", "RR_cumul_campagne", "ETP", "ETP_cumul_campagne",
+    "Bilan_hydrique_J", "Bilan_hydrique_cumul", "RFU_mm", "Stress_hydrique",
+    "Gel_printanier", "Gel_printanier_severe", "Echaudage_jour",
+    "Jour_ideal_maturation", "Jour_ideal_vendange",
 ]
-df_indices = df[colonnes_indices]
+COLS_RISQUES = [
+    "Date", "Annee", "Mois",
+    "T_moy", "T_max", "RR", "RR_48h", "RR_7j", "HR_moy",
+    "Mildiou_score", "Mildiou_risque",
+    "Oidium_score", "Oidium_risque",
+    "Botrytis_score", "Botrytis_risque",
+    "Echaudage_jour", "Fenetre_traitement_OK",
+]
 
 with pd.ExcelWriter(FICHIER_EXCEL, engine="openpyxl") as writer:
     df_readme.to_excel(writer, sheet_name="README", index=False)
-    df_millesimes.to_excel(writer, sheet_name="Millésimes", index=False)
-    synthese_mens.to_excel(writer, sheet_name="Synthèse_mensuelle", index=False)
-    df_indices.to_excel(writer, sheet_name="Indices_J", index=False)
-    df_brutes.to_excel(writer, sheet_name="Données_brutes_J", index=False)
+    df_millesimes.to_excel(writer, sheet_name="Millesimes", index=False)
+    synthese_dec.to_excel(writer, sheet_name="Decennies_50ans", index=False)
+    synthese_mens.to_excel(writer, sheet_name="Synthese_mensuelle", index=False)
+    normales_mens.to_excel(writer, sheet_name="Normales_1991_2020", index=False)
+    if not df_phenologie.empty:
+        df_phenologie.to_excel(writer, sheet_name="Phenologie_terrain", index=False)
+    if not df_observations.empty:
+        df_observations.to_excel(writer, sheet_name="Observations_terrain", index=False)
+    df[COLS_RISQUES].to_excel(writer, sheet_name="Risques_J", index=False)
+    df[COLS_INDICES].to_excel(writer, sheet_name="Indices_J", index=False)
+    df[COLS_BRUTES].to_excel(writer, sheet_name="Donnees_brutes_J", index=False)
 
-print(f"✅ Terminé. {len(df)} jours téléchargés depuis le {DATE_DEBUT}.")
-print(f"   Fichier produit : {FICHIER_EXCEL}")
+print()
+print(f"✅ Terminé. {len(df)} jours sur {df['Annee'].nunique()} années.")
+print(f"   Fichier : {FICHIER_EXCEL}")
+print(f"   Onglets : README, Millesimes, Decennies_50ans, Synthese_mensuelle,")
+print(f"             Normales_1991_2020, Phenologie_terrain, Observations_terrain,")
+print(f"             Risques_J, Indices_J, Donnees_brutes_J")
