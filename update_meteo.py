@@ -65,23 +65,45 @@ VARIABLES_DAILY = [
 ]
 
 
-def telecharger_periode(url, debut, fin, source_label):
-    """Télécharge une période depuis une API Open-Meteo."""
-    print(f"  Téléchargement {source_label} : {debut} → {fin}...")
-    params = {
-        "latitude": LATITUDE,
-        "longitude": LONGITUDE,
-        "start_date": debut.isoformat(),
-        "end_date": fin.isoformat(),
-        "daily": ",".join(VARIABLES_DAILY),
-        "timezone": "Europe/Paris",
-        "wind_speed_unit": "kmh",
-    }
-    r = requests.get(url, params=params, timeout=120)
-    r.raise_for_status()
-    df = pd.DataFrame(r.json()["daily"])
-    df["source"] = source_label
-    return df
+import time
+
+   def telecharger_periode(url, debut, fin, source_label):
+       """Télécharge une période depuis une API Open-Meteo, par tranches d'un an."""
+       print(f"  Téléchargement {source_label} : {debut} → {fin}...")
+       morceaux = []
+       cursor = debut
+       while cursor <= fin:
+           # tranche d'1 an au plus
+           fin_tranche = min(date(cursor.year, 12, 31), fin)
+           params = {
+               "latitude": LATITUDE,
+               "longitude": LONGITUDE,
+               "start_date": cursor.isoformat(),
+               "end_date": fin_tranche.isoformat(),
+               "daily": ",".join(VARIABLES_DAILY),
+               "timezone": "Europe/Paris",
+               "wind_speed_unit": "kmh",
+           }
+           # plusieurs tentatives en cas de 429
+           for tentative in range(5):
+               r = requests.get(url, params=params, timeout=120)
+               if r.status_code == 429:
+                   attente = 5 * (tentative + 1)
+                   print(f"    429 reçu, attente {attente}s puis nouvelle tentative...")
+                   time.sleep(attente)
+                   continue
+               r.raise_for_status()
+               break
+           else:
+               r.raise_for_status()
+           df_t = pd.DataFrame(r.json()["daily"])
+           morceaux.append(df_t)
+           print(f"    {cursor.year} ok ({len(df_t)} jours)")
+           cursor = fin_tranche + timedelta(days=1)
+           time.sleep(1.2)  # politesse, évite de surcharger l'API
+       df_full = pd.concat(morceaux, ignore_index=True)
+       df_full["source"] = source_label
+       return df_full
 
 
 print("ÉTAPE 1/6 — Téléchargement météo")
