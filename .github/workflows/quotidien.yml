@@ -2,17 +2,17 @@ name: Mise à jour quotidienne météo Clos Thierrière
 
 on:
   schedule:
-    - cron: "0 6 * * *"   # tous les jours à 6h UTC = 7h ou 8h en France
-  workflow_dispatch:       # permet aussi de lancer à la main depuis GitHub
+    - cron: "0 6 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-     meteo:
-       runs-on: ubuntu-latest
-       env:
-         FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  meteo:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     steps:
       - name: Récupérer le code
         uses: actions/checkout@v4
