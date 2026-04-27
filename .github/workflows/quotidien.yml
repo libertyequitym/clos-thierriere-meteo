@@ -1,0 +1,35 @@
+name: Mise à jour quotidienne météo Clos Thierrière
+
+on:
+  schedule:
+    - cron: "0 6 * * *"   # tous les jours à 6h UTC = 7h ou 8h en France
+  workflow_dispatch:       # permet aussi de lancer à la main depuis GitHub
+
+permissions:
+  contents: write
+
+jobs:
+  meteo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer les outils
+        run: pip install -r requirements.txt
+
+      - name: Lancer le robot météo
+        run: python update_meteo.py
+
+      - name: Sauvegarder le fichier Excel mis à jour
+        run: |
+          git config user.name "robot-meteo"
+          git config user.email "robot@closthierriere.fr"
+          git add clos_thierriere_climato.xlsx
+          git diff --staged --quiet || git commit -m "MAJ météo automatique $(date +%Y-%m-%d)"
+          git push
