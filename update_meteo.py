@@ -896,3 +896,855 @@ print(f"✅ Terminé. {len(df)} jours sur {df['Annee'].nunique()} années.")
 print(f"   Excel : {FICHIER_EXCEL} (13 onglets)")
 print(f"   Brutes : {FICHIER_BRUTES} ({len(df_brut)} jours)")
 print(f"   Tours : {FICHIER_TOURS} ({len(df_tours)} jours)" if not df_tours.empty else "   Tours : (vide)")
+# =============================================================================
+# 13. GÉNÉRATION DU SITE WEB (GitHub Pages)
+# =============================================================================
+print()
+print("ÉTAPE 8/8 — Génération du site web")
+
+import shutil
+SITE_DIR = Path("docs")
+SITE_DIR.mkdir(exist_ok=True)
+
+# Copier l'Excel dans le site pour qu'il soit téléchargeable directement
+shutil.copy(FICHIER_EXCEL, SITE_DIR / FICHIER_EXCEL)
+
+# Données utiles pour les pages
+DERNIER_JOUR = df.iloc[-1]
+ANNEE_COURANTE = int(DERNIER_JOUR["Annee"])
+DATE_MAJ = date.today().isoformat()
+
+# Helpers de formatage
+def fmt(val, decimales=1, suffixe=""):
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return "—"
+    if decimales == 0:
+        return f"{int(round(val))}{suffixe}"
+    return f"{val:.{decimales}f}{suffixe}"
+
+
+# CSS commun à toutes les pages — charte Clos Thierrière
+CSS_COMMUN = """
+:root {
+  --vert-sauge: #536158;
+  --vert-sauge-clair: #6B7B71;
+  --vert-sauge-fonce: #3D4942;
+  --creme: #F5F1E8;
+  --creme-fonce: #E8E2D2;
+  --ocre: #D4A93B;
+  --bordeaux: #7A2E2E;
+  --noir-doux: #2A2A2A;
+  --gris: #8A857A;
+  --blanc: #FDFCF8;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 300;
+  background: var(--creme);
+  color: var(--noir-doux);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono { font-family: 'JetBrains Mono', 'Courier New', monospace; }
+
+a { color: var(--vert-sauge); text-decoration: none; border-bottom: 1px solid transparent; transition: all 0.2s; }
+a:hover { border-bottom-color: var(--vert-sauge); }
+
+/* HEADER */
+.header {
+  background: var(--vert-sauge);
+  color: var(--creme);
+  padding: 1rem 2rem;
+  border-bottom: 3px solid var(--ocre);
+}
+.header-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.logo {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+}
+.monogramme {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  background: var(--ocre);
+  color: var(--vert-sauge-fonce);
+  padding: 0.2rem 0.5rem;
+  border-radius: 2px;
+}
+.logo-titre { font-size: 1.1rem; font-weight: 400; letter-spacing: 0.05em; }
+.logo-soustitre { font-size: 0.75rem; opacity: 0.7; font-family: 'JetBrains Mono', monospace; }
+
+nav ul { list-style: none; display: flex; gap: 1.5rem; flex-wrap: wrap; }
+nav a {
+  color: var(--creme);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border-bottom: 1px solid transparent;
+}
+nav a:hover, nav a.active { border-bottom-color: var(--ocre); color: var(--ocre); }
+
+/* MAIN */
+main { max-width: 1200px; margin: 2rem auto; padding: 0 2rem; }
+.section { margin-bottom: 3rem; }
+.section-titre {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--vert-sauge);
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--vert-sauge);
+}
+h1 {
+  font-weight: 200;
+  font-size: 2.5rem;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.5rem;
+  color: var(--vert-sauge-fonce);
+}
+h2 {
+  font-weight: 300;
+  font-size: 1.5rem;
+  margin: 2rem 0 1rem;
+  color: var(--vert-sauge-fonce);
+}
+p { margin-bottom: 1rem; max-width: 70ch; }
+
+/* BANDEAU CHIFFRES-CLÉS */
+.bandeau-cles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  background: var(--blanc);
+  padding: 2rem;
+  border-radius: 4px;
+  border-left: 4px solid var(--ocre);
+  margin-bottom: 2rem;
+}
+.cle-bloc { text-align: center; padding: 0.5rem; }
+.cle-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--gris);
+  margin-bottom: 0.5rem;
+}
+.cle-valeur {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 2rem;
+  font-weight: 500;
+  color: var(--vert-sauge-fonce);
+  line-height: 1;
+}
+.cle-unite { font-size: 0.9rem; color: var(--gris); margin-left: 0.2rem; }
+
+/* CARTES */
+.cartes { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 1.5rem; }
+.carte {
+  background: var(--blanc);
+  padding: 1.5rem;
+  border-radius: 4px;
+  border-top: 3px solid var(--vert-sauge);
+}
+.carte h3 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--vert-sauge);
+  margin-bottom: 1rem;
+}
+.carte-valeur {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.8rem;
+  color: var(--vert-sauge-fonce);
+  margin-bottom: 0.5rem;
+}
+.carte-detail { font-size: 0.85rem; color: var(--gris); }
+
+/* TABLEAUX */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--blanc);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  margin: 1rem 0;
+}
+th {
+  background: var(--vert-sauge);
+  color: var(--creme);
+  padding: 0.7rem 1rem;
+  text-align: left;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.75rem;
+}
+td { padding: 0.6rem 1rem; border-bottom: 1px solid var(--creme-fonce); }
+tr:hover { background: var(--creme); }
+tr.highlight { background: rgba(212, 169, 59, 0.15); }
+
+/* BADGES */
+.badge {
+  display: inline-block;
+  padding: 0.2rem 0.7rem;
+  border-radius: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.badge-faible { background: #D4E5D9; color: #2D5A3D; }
+.badge-modere { background: #F2E4B8; color: #7A5C0E; }
+.badge-eleve { background: #F5C9A8; color: #8C4A1A; }
+.badge-tres-eleve { background: #F2B8B8; color: #7A2E2E; }
+.badge-info { background: var(--creme-fonce); color: var(--vert-sauge-fonce); }
+
+/* ALERTES */
+.alerte {
+  padding: 1rem 1.5rem;
+  border-radius: 4px;
+  margin: 1rem 0;
+  border-left: 4px solid;
+}
+.alerte-info { background: var(--blanc); border-left-color: var(--vert-sauge); }
+.alerte-attention { background: #FCF6E1; border-left-color: var(--ocre); }
+.alerte-danger { background: #F5DDDD; border-left-color: var(--bordeaux); color: var(--bordeaux); }
+
+/* CTA */
+.btn {
+  display: inline-block;
+  background: var(--vert-sauge);
+  color: var(--creme) !important;
+  padding: 0.8rem 1.5rem;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border: none;
+  transition: all 0.2s;
+}
+.btn:hover { background: var(--vert-sauge-fonce); border-bottom: none; }
+.btn-ocre { background: var(--ocre); color: var(--vert-sauge-fonce) !important; }
+.btn-ocre:hover { background: #B89230; }
+
+/* FOOTER */
+footer {
+  margin-top: 4rem;
+  padding: 2rem;
+  background: var(--vert-sauge-fonce);
+  color: var(--creme);
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+}
+footer .maj { color: var(--ocre); }
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .header-inner { flex-direction: column; align-items: flex-start; }
+  nav ul { flex-direction: column; gap: 0.5rem; }
+  h1 { font-size: 1.8rem; }
+  .cle-valeur { font-size: 1.5rem; }
+  main { padding: 0 1rem; }
+}
+
+/* GRAPHIQUES */
+.bar-chart { display: flex; flex-direction: column; gap: 0.3rem; margin: 1rem 0; }
+.bar-row { display: flex; align-items: center; gap: 0.5rem; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }
+.bar-label { width: 60px; color: var(--gris); }
+.bar-track { flex: 1; height: 16px; background: var(--creme-fonce); border-radius: 2px; overflow: hidden; position: relative; }
+.bar-fill { height: 100%; background: var(--vert-sauge); border-radius: 2px; transition: width 0.5s; }
+.bar-fill.chaud { background: var(--ocre); }
+.bar-fill.tres-chaud { background: var(--bordeaux); }
+.bar-value { width: 50px; text-align: right; color: var(--vert-sauge-fonce); }
+"""
+
+
+def page_html(titre, contenu, page_active=""):
+    """Squelette HTML commun à toutes les pages."""
+    nav_items = [
+        ("index.html", "Accueil"),
+        ("millesime.html", "Millésime"),
+        ("historique.html", "Historique"),
+        ("risques.html", "Risques"),
+        ("phenologie.html", "Phénologie"),
+        ("methodologie.html", "Méthodologie"),
+    ]
+    nav_html = "".join([
+        f'<li><a href="{href}" class="{"active" if href == page_active else ""}">{label}</a></li>'
+        for href, label in nav_items
+    ])
+    return f"""<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{titre} — Clos Thierrière</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>{CSS_COMMUN}</style>
+</head>
+<body>
+<header class="header">
+  <div class="header-inner">
+    <div class="logo">
+      <span class="monogramme">CF</span>
+      <div>
+        <div class="logo-titre">Clos Thierrière</div>
+        <div class="logo-soustitre">Vouvray · Vernou-sur-Brenne</div>
+      </div>
+    </div>
+    <nav><ul>{nav_html}</ul></nav>
+  </div>
+</header>
+<main>
+{contenu}
+</main>
+<footer>
+  Données mises à jour le <span class="maj">{DATE_MAJ}</span>
+  · ERA5 + AROME + Tours-St-Symphorien · Période : {df['Date'].min().date()} → {df['Date'].max().date()}
+  · <a href="{FICHIER_EXCEL}" style="color: var(--ocre);">Télécharger l'Excel</a>
+</footer>
+</body>
+</html>"""
+
+
+# =============================================================================
+# PAGE 1 — ACCUEIL
+# =============================================================================
+hier = df.iloc[-1]
+ajd_huglin = df_millesimes[df_millesimes["Millesime"] == ANNEE_COURANTE]
+huglin_courant = ajd_huglin["Indice_Huglin"].iloc[0] if len(ajd_huglin) else 0
+gel_print_courant = ajd_huglin["Jours_gel_printanier_ajuste"].iloc[0] if len(ajd_huglin) else 0
+gel_print_severe_courant = ajd_huglin["Jours_gel_printanier_severe_ajuste"].iloc[0] if len(ajd_huglin) else 0
+
+# Statut sanitaire actuel
+risques_30j = df.tail(30)
+mildiou_jours = int((risques_30j["Mildiou_score"] >= 3).sum())
+oidium_jours = int((risques_30j["Oidium_score"] >= 5).sum())
+botrytis_jours = int((risques_30j["Botrytis_score"] >= 3).sum())
+
+contenu_accueil = f"""
+<div class="section">
+  <h1>Climat & vigne</h1>
+  <p style="font-size: 1.1rem; color: var(--gris); max-width: 600px;">
+    Suivi climatologique du domaine sur 35 ans. Mise à jour quotidienne automatique.
+    Sources : ERA5, AROME 1 km Météo-France, station officielle Tours-Saint-Symphorien.
+  </p>
+</div>
+
+<div class="section">
+  <div class="section-titre">État du domaine — {hier['Date'].strftime('%d %B %Y')}</div>
+  <div class="bandeau-cles">
+    <div class="cle-bloc">
+      <div class="cle-label">Température min</div>
+      <div class="cle-valeur">{fmt(hier['T_min'], 1)}<span class="cle-unite">°C</span></div>
+    </div>
+    <div class="cle-bloc">
+      <div class="cle-label">Température max</div>
+      <div class="cle-valeur">{fmt(hier['T_max'], 1)}<span class="cle-unite">°C</span></div>
+    </div>
+    <div class="cle-bloc">
+      <div class="cle-label">Précipitations</div>
+      <div class="cle-valeur">{fmt(hier['RR'], 1)}<span class="cle-unite">mm</span></div>
+    </div>
+    <div class="cle-bloc">
+      <div class="cle-label">Réserve sol</div>
+      <div class="cle-valeur">{fmt(hier['RFU_mm'], 0)}<span class="cle-unite">mm</span></div>
+    </div>
+    <div class="cle-bloc">
+      <div class="cle-label">Huglin {ANNEE_COURANTE}</div>
+      <div class="cle-valeur">{fmt(huglin_courant, 0)}</div>
+    </div>
+    <div class="cle-bloc">
+      <div class="cle-label">Gel printanier</div>
+      <div class="cle-valeur">{int(gel_print_courant)}<span class="cle-unite">j</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-titre">Risques sanitaires — 30 derniers jours</div>
+  <div class="cartes">
+    <div class="carte">
+      <h3>Mildiou</h3>
+      <div class="carte-valeur">{mildiou_jours}<span style="font-size: 1rem; color: var(--gris);"> jours à risque élevé</span></div>
+      <div class="carte-detail">Score Goidanich ≥ 3 sur 30 derniers jours</div>
+    </div>
+    <div class="carte">
+      <h3>Oïdium</h3>
+      <div class="carte-valeur">{oidium_jours}<span style="font-size: 1rem; color: var(--gris);"> jours à risque élevé</span></div>
+      <div class="carte-detail">Score Gubler-Thomas ≥ 5 sur 30 derniers jours</div>
+    </div>
+    <div class="carte">
+      <h3>Botrytis</h3>
+      <div class="carte-valeur">{botrytis_jours}<span style="font-size: 1rem; color: var(--gris);"> jours à risque élevé</span></div>
+      <div class="carte-detail">Score combiné ≥ 3 sur 30 derniers jours</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-titre">Téléchargement</div>
+  <p>Toutes les données du domaine (35 ans, 13 onglets, indices viticoles experts) sont disponibles en un fichier Excel mis à jour chaque matin.</p>
+  <a href="{FICHIER_EXCEL}" class="btn btn-ocre">⬇ Télécharger l'Excel complet</a>
+</div>
+"""
+
+(SITE_DIR / "index.html").write_text(page_html("Accueil", contenu_accueil, "index.html"), encoding="utf-8")
+
+
+# =============================================================================
+# PAGE 2 — MILLÉSIME EN COURS
+# =============================================================================
+mil = df_millesimes[df_millesimes["Millesime"] == ANNEE_COURANTE]
+mil_prec = df_millesimes[df_millesimes["Millesime"] == ANNEE_COURANTE - 1]
+mil_norm_3a = df_millesimes[(df_millesimes["Millesime"] >= ANNEE_COURANTE - 5) & (df_millesimes["Millesime"] < ANNEE_COURANTE)]
+
+if len(mil) > 0:
+    m = mil.iloc[0]
+    huglin_norm = mil_norm_3a["Indice_Huglin"].mean() if len(mil_norm_3a) else 0
+    delta_huglin = m["Indice_Huglin"] - huglin_norm if huglin_norm else 0
+    rr_norm = mil_norm_3a["RR_totale_mm"].mean() if len(mil_norm_3a) else 0
+    delta_rr = m["RR_totale_mm"] - rr_norm if rr_norm else 0
+    
+    contenu_millesime = f"""
+<div class="section">
+  <h1>Millésime {ANNEE_COURANTE}</h1>
+  <p style="color: var(--gris);">État de la saison à date du {hier['Date'].strftime('%d %B %Y')}</p>
+</div>
+
+<div class="section">
+  <div class="section-titre">Indices climatiques</div>
+  <div class="cartes">
+    <div class="carte">
+      <h3>Huglin</h3>
+      <div class="carte-valeur">{fmt(m['Indice_Huglin'], 0)}</div>
+      <div class="carte-detail">{m['Classe_Huglin']}</div>
+      <div class="carte-detail" style="margin-top: 0.5rem; color: var(--vert-sauge);">
+        {'+' if delta_huglin > 0 else ''}{fmt(delta_huglin, 0)} vs moyenne 5 ans
+      </div>
+    </div>
+    <div class="carte">
+      <h3>Winkler (GDD)</h3>
+      <div class="carte-valeur">{fmt(m['Indice_Winkler'], 0)}</div>
+      <div class="carte-detail">{m['Classe_Winkler']}</div>
+    </div>
+    <div class="carte">
+      <h3>Précipitations</h3>
+      <div class="carte-valeur">{fmt(m['RR_totale_mm'], 0)}<span class="cle-unite">mm</span></div>
+      <div class="carte-detail" style="margin-top: 0.5rem; color: var(--vert-sauge);">
+        {'+' if delta_rr > 0 else ''}{fmt(delta_rr, 0)} mm vs moyenne 5 ans
+      </div>
+    </div>
+    <div class="carte">
+      <h3>Bilan hydrique</h3>
+      <div class="carte-valeur">{fmt(m['Bilan_hydrique_campagne'], 0)}<span class="cle-unite">mm</span></div>
+      <div class="carte-detail">RR campagne − ETP campagne</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-titre">Risques relevés</div>
+  <div class="cartes">
+    <div class="carte">
+      <h3>Gel printanier</h3>
+      <div class="carte-valeur">{int(m['Jours_gel_printanier_ajuste'])} <span style="font-size: 1rem;color: var(--gris);">jours</span></div>
+      <div class="carte-detail">dont {int(m['Jours_gel_printanier_severe_ajuste'])} jours sévères (T_min ≤ -2°C ajustée)</div>
+      <div class="carte-detail" style="margin-top: 0.5rem;">Tours observé : {int(m['Jours_gel_observe_tours'])} jours</div>
+    </div>
+    <div class="carte">
+      <h3>Jours chauds</h3>
+      <div class="carte-valeur">{int(m['Jours_chauds_30C'])} <span style="font-size: 1rem; color: var(--gris);">à 30°C+</span></div>
+      <div class="carte-detail">{int(m['Jours_chauds_35C'])} jours à 35°C+</div>
+      <div class="carte-detail">{int(m['Nuits_tropicales'])} nuits tropicales</div>
+    </div>
+    <div class="carte">
+      <h3>Jours idéaux maturation</h3>
+      <div class="carte-valeur">{int(m['Jours_ideaux_maturation'])}</div>
+      <div class="carte-detail">T_max 22-28°C, T_min 12-18°C, sec — août-septembre</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-titre">Lecture du millésime</div>
+  <p>Le millésime {ANNEE_COURANTE} est classé <strong>{m['Classe_Huglin'].lower()}</strong> selon Huglin
+  (indice {fmt(m['Indice_Huglin'], 0)}), avec un bilan hydrique de campagne de {fmt(m['Bilan_hydrique_campagne'], 0)} mm.
+  La fraîcheur des nuits de septembre, indicateur clé pour le Chenin, est de
+  {fmt(m['IF_septembre'], 1) if pd.notna(m['IF_septembre']) else 'à mesurer'}°C
+  ({m['Classe_IF_nuits']}).</p>
+</div>
+"""
+else:
+    contenu_millesime = f"<div class='section'><h1>Millésime {ANNEE_COURANTE}</h1><p>Données en cours de constitution.</p></div>"
+
+(SITE_DIR / "millesime.html").write_text(page_html(f"Millésime {ANNEE_COURANTE}", contenu_millesime, "millesime.html"), encoding="utf-8")
+
+
+# =============================================================================
+# PAGE 3 — HISTORIQUE
+# =============================================================================
+huglin_min = df_millesimes["Indice_Huglin"].min()
+huglin_max = df_millesimes["Indice_Huglin"].max()
+
+bar_chart = ""
+for _, ligne in df_millesimes.iterrows():
+    if pd.isna(ligne["Indice_Huglin"]) or ligne["Indice_Huglin"] == 0:
+        continue
+    pct = (ligne["Indice_Huglin"] - huglin_min) / (huglin_max - huglin_min) * 100 if huglin_max > huglin_min else 50
+    classe_bar = "bar-fill"
+    if ligne["Indice_Huglin"] > 2100: classe_bar += " chaud"
+    if ligne["Indice_Huglin"] > 2400: classe_bar += " tres-chaud"
+    bar_chart += f"""
+    <div class="bar-row">
+      <span class="bar-label">{int(ligne["Millesime"])}</span>
+      <div class="bar-track"><div class="{classe_bar}" style="width: {pct}%"></div></div>
+      <span class="bar-value">{fmt(ligne["Indice_Huglin"], 0)}</span>
+    </div>"""
+
+# Tableau récap années récentes
+lignes_table = ""
+for _, ligne in df_millesimes.tail(15).iterrows():
+    if pd.isna(ligne["Indice_Huglin"]):
+        continue
+    highlight = "highlight" if ligne["Millesime"] == ANNEE_COURANTE else ""
+    lignes_table += f"""
+    <tr class="{highlight}">
+      <td><strong>{int(ligne['Millesime'])}</strong></td>
+      <td>{fmt(ligne['Indice_Huglin'], 0)}</td>
+      <td>{ligne['Classe_Huglin']}</td>
+      <td>{fmt(ligne['T_moy_annuelle'], 1)}°C</td>
+      <td>{fmt(ligne['RR_totale_mm'], 0)} mm</td>
+      <td>{int(ligne['Jours_gel_printanier_ajuste'])}j</td>
+      <td>{int(ligne['Jours_chauds_30C'])}j</td>
+    </tr>"""
+
+contenu_historique = f"""
+<div class="section">
+  <h1>35 millésimes</h1>
+  <p>Évolution des indices climatiques de 1990 à {ANNEE_COURANTE}.</p>
+</div>
+
+<div class="section">
+  <div class="section-titre">Indice Huglin par millésime</div>
+  <p style="margin-bottom: 1.5rem; color: var(--gris); font-size: 0.9rem;">
+    Huglin = potentiel héliothermique pour la maturité. Vert : tempéré.
+    Ocre : tempéré chaud (>2100). Bordeaux : chaud à très chaud (>2400).
+  </p>
+  <div class="bar-chart">{bar_chart}</div>
+</div>
+
+<div class="section">
+  <div class="section-titre">Détail des 15 derniers millésimes</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Année</th><th>Huglin</th><th>Classe</th><th>T° moy.</th><th>Pluie</th><th>Gel print.</th><th>Jours 30°C+</th>
+      </tr>
+    </thead>
+    <tbody>{lignes_table}</tbody>
+  </table>
+</div>
+
+<div class="section">
+  <div class="section-titre">Tendance sur les décennies</div>
+  <table>
+    <thead><tr><th>Décennie</th><th>T° moyenne</th><th>Pluie / an</th><th>Jours gel / an</th><th>Jours 30°C+ / an</th><th>Jours 35°C+ / an</th></tr></thead>
+    <tbody>
+"""
+for _, ligne in synthese_dec.iterrows():
+    contenu_historique += f"""
+    <tr>
+      <td><strong>{int(ligne['Decennie'])}s</strong></td>
+      <td>{fmt(ligne['T_moy_decennie'], 2)}°C</td>
+      <td>{fmt(ligne['RR_an_moy'], 0)} mm</td>
+      <td>{fmt(ligne['Jours_gel_an_moy'], 1)}j</td>
+      <td>{fmt(ligne['Jours_chauds_30_an_moy'], 1)}j</td>
+      <td>{fmt(ligne['Jours_chauds_35_an_moy'], 1)}j</td>
+    </tr>"""
+contenu_historique += "</tbody></table></div>"
+
+(SITE_DIR / "historique.html").write_text(page_html("Historique", contenu_historique, "historique.html"), encoding="utf-8")
+
+
+# =============================================================================
+# PAGE 4 — RISQUES SANITAIRES
+# =============================================================================
+risques_90j = df.tail(90).copy()
+
+def frise_risque(serie, seuil_eleve, label):
+    out = '<div style="display: flex; gap: 2px; margin: 0.5rem 0; flex-wrap: nowrap;">'
+    for v in serie:
+        if pd.isna(v) or v < seuil_eleve - 1:
+            color = "var(--creme-fonce)"
+        elif v < seuil_eleve:
+            color = "var(--ocre)"
+        else:
+            color = "var(--bordeaux)"
+        out += f'<div style="flex:1; min-width: 4px; height: 24px; background: {color}; border-radius: 1px;" title="{v}"></div>'
+    out += '</div>'
+    return out
+
+frise_mildiou = frise_risque(risques_90j["Mildiou_score"], 3, "Mildiou")
+frise_oidium = frise_risque(risques_90j["Oidium_score"], 5, "Oïdium")
+frise_botrytis = frise_risque(risques_90j["Botrytis_score"], 3, "Botrytis")
+
+# Statuts actuels
+mildiou_act = df.iloc[-1].get("Mildiou_risque", "—")
+oidium_act = df.iloc[-1].get("Oidium_risque", "—")
+botrytis_act = df.iloc[-1].get("Botrytis_risque", "—")
+
+def badge_class(niveau):
+    n = str(niveau).lower()
+    if "tres" in n.replace("é", "e"): return "badge-tres-eleve"
+    if "elev" in n.replace("é", "e"): return "badge-eleve"
+    if "modér" in n.lower() or "modere" in n.lower(): return "badge-modere"
+    return "badge-faible"
+
+contenu_risques = f"""
+<div class="section">
+  <h1>Risques sanitaires</h1>
+  <p>Modélisation des risques épidémiologiques mildiou, oïdium et botrytis.</p>
+</div>
+
+<div class="section">
+  <div class="section-titre">Statut au {hier['Date'].strftime('%d %B %Y')}</div>
+  <div class="cartes">
+    <div class="carte">
+      <h3>Mildiou</h3>
+      <div class="carte-valeur">
+        <span class="badge {badge_class(mildiou_act)}">{mildiou_act}</span>
+      </div>
+      <div class="carte-detail">Modèle Goidanich simplifié</div>
+    </div>
+    <div class="carte">
+      <h3>Oïdium</h3>
+      <div class="carte-valeur">
+        <span class="badge {badge_class(oidium_act)}">{oidium_act}</span>
+      </div>
+      <div class="carte-detail">Modèle Gubler-Thomas</div>
+    </div>
+    <div class="carte">
+      <h3>Botrytis</h3>
+      <div class="carte-valeur">
+        <span class="badge {badge_class(botrytis_act)}">{botrytis_act}</span>
+      </div>
+      <div class="carte-detail">Score combiné HR/RR/T°</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-titre">Évolution sur 90 derniers jours</div>
+  <p style="color: var(--gris); font-size: 0.9rem;">
+    <span style="display:inline-block; width:12px; height:12px; background: var(--creme-fonce); border-radius:1px; vertical-align: middle;"></span> Faible
+    &nbsp;
+    <span style="display:inline-block; width:12px; height:12px; background: var(--ocre); border-radius:1px; vertical-align: middle;"></span> Modéré
+    &nbsp;
+    <span style="display:inline-block; width:12px; height:12px; background: var(--bordeaux); border-radius:1px; vertical-align: middle;"></span> Élevé
+  </p>
+  
+  <div style="margin: 1.5rem 0;">
+    <div style="font-family: monospace; font-size: 0.85rem; color: var(--vert-sauge); margin-bottom: 0.3rem;">MILDIOU</div>
+    {frise_mildiou}
+  </div>
+  <div style="margin: 1.5rem 0;">
+    <div style="font-family: monospace; font-size: 0.85rem; color: var(--vert-sauge); margin-bottom: 0.3rem;">OÏDIUM</div>
+    {frise_oidium}
+  </div>
+  <div style="margin: 1.5rem 0;">
+    <div style="font-family: monospace; font-size: 0.85rem; color: var(--vert-sauge); margin-bottom: 0.3rem;">BOTRYTIS</div>
+    {frise_botrytis}
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-titre">Fenêtres de traitement</div>
+  <p>Une fenêtre de traitement est jugée favorable si : pas de pluie ce jour ni demain, vent &lt; 30 km/h, humidité &lt; 85%.</p>
+  <p>Sur les 30 derniers jours : <strong>{int(df.tail(30)['Fenetre_traitement_OK'].sum())} fenêtres favorables</strong> sur 30 jours.</p>
+</div>
+"""
+
+(SITE_DIR / "risques.html").write_text(page_html("Risques sanitaires", contenu_risques, "risques.html"), encoding="utf-8")
+
+
+# =============================================================================
+# PAGE 5 — PHÉNOLOGIE
+# =============================================================================
+GSHEET_LIEN = f"https://docs.google.com/spreadsheets/d/{GSHEET_ID}"
+
+if not df_phenologie.empty:
+    table_pheno = df_phenologie.to_html(index=False, classes="", border=0)
+else:
+    table_pheno = "<p>Aucune donnée saisie pour l'instant.</p>"
+
+if not df_observations.empty:
+    table_obs = df_observations.to_html(index=False, classes="", border=0)
+else:
+    table_obs = "<p>Aucune observation saisie pour l'instant.</p>"
+
+contenu_phenologie = f"""
+<div class="section">
+  <h1>Phénologie & observations</h1>
+  <p>Saisies terrain par l'équipe du domaine. Permettent de calibrer les modèles phénologiques (GFV, GSR, BBCH) sur le contexte spécifique de Vernou.</p>
+</div>
+
+<div class="section">
+  <div class="section-titre">Saisir de nouvelles données</div>
+  <p>Les saisies se font directement dans un Google Sheet partagé. Elles sont automatiquement intégrées au fichier Excel à chaque mise à jour quotidienne.</p>
+  <a href="{GSHEET_LIEN}" target="_blank" rel="noopener" class="btn">Ouvrir le tableau de saisie ↗</a>
+</div>
+
+<div class="section">
+  <div class="section-titre">Dates phénologiques par millésime</div>
+  {table_pheno}
+</div>
+
+<div class="section">
+  <div class="section-titre">Observations terrain</div>
+  {table_obs}
+</div>
+"""
+
+(SITE_DIR / "phenologie.html").write_text(page_html("Phénologie", contenu_phenologie, "phenologie.html"), encoding="utf-8")
+
+
+# =============================================================================
+# PAGE 6 — MÉTHODOLOGIE
+# =============================================================================
+# Convertir le DataFrame methodologie en sections lisibles
+sections_methodo_html = ""
+section_courante = None
+for _, ligne in df_methodologie.iterrows():
+    indicateur = ligne["Indicateur"]
+    if pd.isna(ligne["Formule"]) and indicateur and not pd.isna(indicateur):
+        # C'est un titre de section
+        if section_courante is not None:
+            sections_methodo_html += "</div>"
+        sections_methodo_html += f'<h2 style="margin-top: 2.5rem;">{indicateur}</h2><div>'
+        section_courante = indicateur
+    elif not pd.isna(indicateur):
+        sections_methodo_html += f"""
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3>{indicateur}</h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            {ligne['Formule'] if not pd.isna(ligne['Formule']) else ''}
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> {ligne['Période de calcul'] if not pd.isna(ligne['Période de calcul']) else '—'}</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> {ligne['Interprétation viticole'] if not pd.isna(ligne['Interprétation viticole']) else '—'}</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> {ligne['Classes / Seuils'] if not pd.isna(ligne['Classes / Seuils']) else '—'}</p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;">{ligne['Référence et notes'] if not pd.isna(ligne['Référence et notes']) else ''}</p>
+        </div>
+        """
+if section_courante is not None:
+    sections_methodo_html += "</div>"
+
+# Section calibration gel — affichage des vrais deltas
+delta_ventee = corrections_calibrees.get('ventee', -1.5)
+delta_calme = corrections_calibrees.get('calme_seche', -1.5)
+delta_inter = corrections_calibrees.get('intermediaire', -1.5)
+
+contenu_methodologie = f"""
+<div class="section">
+  <h1>Méthodologie</h1>
+  <p>Sources de données, formules des indices viticoles, calibration de la correction gel.</p>
+</div>
+
+<div class="section">
+  <div class="section-titre">Sources de données</div>
+  <div class="cartes">
+    <div class="carte">
+      <h3>1990 → 2020</h3>
+      <p><strong>ERA5</strong> (Copernicus / ECMWF)</p>
+      <div class="carte-detail">Réanalyse climatique mondiale, résolution 9 km. Référence scientifique homogène sur toute la période.</div>
+    </div>
+    <div class="carte">
+      <h3>2021 → aujourd'hui</h3>
+      <p><strong>AROME 1 km</strong> (Météo-France)</p>
+      <div class="carte-detail">Modèle haute résolution opérationnel. Très précis sur températures moyennes et pluies.</div>
+    </div>
+    <div class="carte">
+      <h3>Validation observée</h3>
+      <p><strong>Tours-Saint-Symphorien</strong> (DPClim Météo-France)</p>
+      <div class="carte-detail">Station officielle, ~11 km du Clos. Données mesurées, valeur juridique.</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-titre">Calibration de la correction gel</div>
+  <p>La correction "cuvette" appliquée à la T_min du modèle AROME pour estimer le risque gel parcellaire est calibrée empiriquement sur le delta moyen entre la station Tours et le modèle AROME, par type de nuit.</p>
+  
+  <div class="alerte alerte-info">
+    <strong>Valeurs calibrées (à la dernière exécution) :</strong>
+    <ul style="margin-top: 0.5rem; list-style: none; padding-left: 0;">
+      <li class="mono">→ Nuit ventée (vent > 25 km/h) : <strong>{delta_ventee:+.2f}°C</strong></li>
+      <li class="mono">→ Nuit calme et sèche (vent < 12 km/h, HR < 85%) : <strong>{delta_calme:+.2f}°C</strong></li>
+      <li class="mono">→ Nuit intermédiaire : <strong>{delta_inter:+.2f}°C</strong></li>
+    </ul>
+  </div>
+  
+  <h2>Limites importantes</h2>
+  <div class="alerte alerte-attention">
+    <strong>Limite n°1 — Tours est en plaine.</strong> Le delta capture l'écart Tours-Vernou, pas l'effet cuvette du Clos. La T_min ajustée sous-estime probablement encore le vrai gel parcellaire en fond de cuvette.
+  </div>
+  <div class="alerte alerte-attention">
+    <strong>Limite n°2 — Pas de calibration parcellaire.</strong> Aucune mesure réelle au Clos n'existe. Une station physique au domaine permettrait un calibrage fin.
+  </div>
+  <div class="alerte alerte-attention">
+    <strong>Limite n°3 — Référence avril 2021.</strong> Tours a mesuré -2.0°C. AROME : -1.0°C. Notre ajusté : -2.5°C. Réalité dans certaines parcelles de Vouvray : -4 à -6°C en fond de vallon.
+  </div>
+  
+  <h2>Lecture des 3 compteurs gel</h2>
+  <div class="cartes">
+    <div class="carte">
+      <h3>Jours_gel_modele</h3>
+      <p>Donnée brute AROME au point centroïde.</p>
+      <div class="carte-detail" style="color: var(--bordeaux);">⚠ Sous-estime systématiquement. Ne pas utiliser seul pour le pilotage.</div>
+    </div>
+    <div class="carte">
+      <h3>Jours_gel_ajuste</h3>
+      <p>Donnée brute + correction calibrée.</p>
+      <div class="carte-detail">Compteur principal pour le pilotage parcellaire.</div>
+    </div>
+    <div class="carte">
+      <h3>Jours_gel_observe_tours</h3>
+      <p>Mesure officielle Tours-St-Symphorien.</p>
+      <div class="carte-detail">Donnée juridiquement opposable en cas de sinistre.</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-titre">Tous les indices calculés</div>
+  <p style="color: var(--gris); margin-bottom: 1.5rem;">Pour chaque indicateur : formule, période de calcul, interprétation viticole et limites.</p>
+  {sections_methodo_html}
+</div>
+"""
+
+(SITE_DIR / "methodologie.html").write_text(page_html("Méthodologie", contenu_methodologie, "methodologie.html"), encoding="utf-8")
+
+
+print(f"  ✅ 6 pages générées dans {SITE_DIR}/")
+print(f"  ✅ Excel copié pour téléchargement : {SITE_DIR / FICHIER_EXCEL}")
