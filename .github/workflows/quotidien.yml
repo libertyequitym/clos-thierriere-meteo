@@ -32,6 +32,6 @@ jobs:
         run: |
           git config user.name "robot-meteo"
           git config user.email "robot@closthierriere.fr"
-          git add clos_thierriere_climato.xlsx
+          git add clos_thierriere_climato.xlsx donnees_brutes.parquet
           git diff --staged --quiet || git commit -m "MAJ météo automatique $(date +%Y-%m-%d)"
           git push
