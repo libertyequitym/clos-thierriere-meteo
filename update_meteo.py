@@ -905,6 +905,7 @@ print("ÉTAPE 8/8 — Génération du site web")
 import shutil
 SITE_DIR = Path("docs")
 SITE_DIR.mkdir(exist_ok=True)
+(SITE_DIR / ".nojekyll").touch()  # Désactive le traitement Jekyll par GitHub Pages
 
 # Copier l'Excel dans le site pour qu'il soit téléchargeable directement
 shutil.copy(FICHIER_EXCEL, SITE_DIR / FICHIER_EXCEL)
