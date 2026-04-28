@@ -1,29 +1,25 @@
 """
-Robot météo Clos Thierrière — v2
-=================================
+Robot météo Clos Thierrière — v3 (stockage incrémental)
+========================================================
 Construit la base climatologique du domaine sur 50 ans (1975 → aujourd'hui)
 en fusionnant deux sources :
   - ERA5 (Copernicus, 9 km) : 1975-12-31 → 2020-12-31
   - AROME 1 km (Météo-France) : 2021-01-01 → hier
 Toutes deux accessibles via Open-Meteo, gratuit, sans clé.
 
-Lit aussi le Google Sheet de saisies terrain (dates phénologiques + observations)
-pour calibrer les modèles et enrichir l'Excel.
+Stockage incrémental : à chaque exécution, on lit le fichier parquet existant,
+et on ne télécharge QUE les jours manquants. Premier lancement = ~10 min,
+lancements suivants = ~30 secondes.
 
-Calcule un panel complet d'indicateurs viticoles experts :
-  - Indices climatiques : Huglin, Winkler, IF Tonietto, Riou, Selianinov
-  - Phénologie : GFV (Parker), GSR, somme T° base 5°C
-  - Risques sanitaires : mildiou (Goidanich), oïdium (Gubler-Thomas), botrytis
-  - Bilan hydrique : ETP, RFU modélisée, stress hydrique
-  - Pratique : fenêtres de traitement, jours idéaux maturation/vendange
-  - Adaptation climatique : tendances, écarts à la normale 1991-2020
-
+Lit aussi le Google Sheet de saisies terrain (dates phénologiques + observations).
+Calcule les indicateurs viticoles experts.
 Produit un fichier Excel multi-onglets prêt pour le site web.
 """
 
 import io
-import math
+import time
 from datetime import date, timedelta
+from pathlib import Path
 
 import pandas as pd
 import requests
@@ -31,29 +27,23 @@ import requests
 # =============================================================================
 # 1. PARAMÈTRES DU DOMAINE
 # =============================================================================
-LATITUDE = 47.4308          # Vernou-sur-Brenne, 210 rue Neuve
+LATITUDE = 47.4308
 LONGITUDE = 0.9572
 NOM_DOMAINE = "Clos Thierrière"
 DATE_DEBUT_HISTOIRE = date(1975, 1, 1)
 DATE_BASCULE_ERA5_AROME = date(2021, 1, 1)
 DATE_FIN = date.today() - timedelta(days=1)
 FICHIER_EXCEL = "clos_thierriere_climato.xlsx"
-
-# Identifiant du Google Sheet "Saisies terrain"
+FICHIER_BRUTES = "donnees_brutes.parquet"
 GSHEET_ID = "1xrqqxom2uDO6jhys0q23xUf2qMV9u9K9skJ3PjhtDwQ"
-
-# Période de référence pour les normales climatiques (standard OMM)
 NORMALE_DEBUT = 1991
 NORMALE_FIN = 2020
 
 print(f"Robot météo — {NOM_DOMAINE}")
 print(f"Position : {LATITUDE}°N, {LONGITUDE}°E")
-print(f"Période : {DATE_DEBUT_HISTOIRE} → {DATE_FIN}")
+print(f"Période cible : {DATE_DEBUT_HISTOIRE} → {DATE_FIN}")
 print()
 
-# =============================================================================
-# 2. TÉLÉCHARGEMENT DES DONNÉES MÉTÉO
-# =============================================================================
 VARIABLES_DAILY = [
     "temperature_2m_max", "temperature_2m_min", "temperature_2m_mean",
     "precipitation_sum", "rain_sum", "snowfall_sum", "precipitation_hours",
@@ -63,73 +53,161 @@ VARIABLES_DAILY = [
     "relative_humidity_2m_mean", "relative_humidity_2m_max", "relative_humidity_2m_min",
     "dew_point_2m_mean",
 ]
-import time
-
-def telecharger_periode(url, debut, fin, source_label):
-       """Télécharge une période depuis une API Open-Meteo, par tranches d'un an."""
-       print(f"  Téléchargement {source_label} : {debut} → {fin}...")
-       morceaux = []
-       cursor = debut
-       while cursor <= fin:
-           # tranche d'1 an au plus
-           fin_tranche = min(date(cursor.year, 12, 31), fin)
-           params = {
-               "latitude": LATITUDE,
-               "longitude": LONGITUDE,
-               "start_date": cursor.isoformat(),
-               "end_date": fin_tranche.isoformat(),
-               "daily": ",".join(VARIABLES_DAILY),
-               "timezone": "Europe/Paris",
-               "wind_speed_unit": "kmh",
-           }
-           # plusieurs tentatives en cas de 429
-           for tentative in range(5):
-               r = requests.get(url, params=params, timeout=120)
-               if r.status_code == 429:
-                   attente = 5 * (tentative + 1)
-                   print(f"    429 reçu, attente {attente}s puis nouvelle tentative...")
-                   time.sleep(attente)
-                   continue
-               r.raise_for_status()
-               break
-           else:
-               r.raise_for_status()
-           df_t = pd.DataFrame(r.json()["daily"])
-           morceaux.append(df_t)
-           print(f"    {cursor.year} ok ({len(df_t)} jours)")
-           cursor = fin_tranche + timedelta(days=1)
-           time.sleep(1.2)  # politesse, évite de surcharger l'API
-       df_full = pd.concat(morceaux, ignore_index=True)
-       df_full["source"] = source_label
-       return df_full
 
 
-print("ÉTAPE 1/6 — Téléchargement météo")
-# ERA5 pour 1975 → 2020-12-31
-df_era5 = telecharger_periode(
-    "https://archive-api.open-meteo.com/v1/archive",
-    DATE_DEBUT_HISTOIRE,
-    DATE_BASCULE_ERA5_AROME - timedelta(days=1),
-    "ERA5",
-)
-# AROME 1 km pour 2021 → hier (via historical-forecast-api)
-df_arome = telecharger_periode(
-    "https://historical-forecast-api.open-meteo.com/v1/forecast",
-    DATE_BASCULE_ERA5_AROME,
-    DATE_FIN,
-    "AROME-1km",
-)
+# =============================================================================
+# 2. TÉLÉCHARGEMENT (par tranches, avec retry)
+# =============================================================================
+def telecharger_periode(url, debut, fin, source_label, mois_par_tranche=12):
+    """Télécharge une période depuis Open-Meteo, par tranches, avec retry."""
+    if debut > fin:
+        return pd.DataFrame()
+    print(f"  Téléchargement {source_label} : {debut} → {fin}...")
+    morceaux = []
+    cursor = debut
+    while cursor <= fin:
+        annee = cursor.year
+        mois = cursor.month
+        mois_fin = mois + mois_par_tranche - 1
+        annee_fin = annee + (mois_fin - 1) // 12
+        mois_fin = ((mois_fin - 1) % 12) + 1
+        if mois_fin == 12:
+            fin_tranche = date(annee_fin, 12, 31)
+        else:
+            fin_tranche = date(annee_fin, mois_fin + 1, 1) - timedelta(days=1)
+        fin_tranche = min(fin_tranche, fin)
 
-df = pd.concat([df_era5, df_arome], ignore_index=True)
-df["time"] = pd.to_datetime(df["time"])
-df = df.sort_values("time").reset_index(drop=True)
-print(f"  Total : {len(df)} jours téléchargés")
+        params = {
+            "latitude": LATITUDE,
+            "longitude": LONGITUDE,
+            "start_date": cursor.isoformat(),
+            "end_date": fin_tranche.isoformat(),
+            "daily": ",".join(VARIABLES_DAILY),
+            "timezone": "Europe/Paris",
+            "wind_speed_unit": "kmh",
+        }
+        succes = False
+        for tentative in range(5):
+            try:
+                r = requests.get(url, params=params, timeout=300)
+                if r.status_code == 429:
+                    attente = 10 * (tentative + 1)
+                    print(f"    429 reçu, attente {attente}s...")
+                    time.sleep(attente)
+                    continue
+                r.raise_for_status()
+                succes = True
+                break
+            except requests.exceptions.Timeout:
+                attente = 15 * (tentative + 1)
+                print(f"    Timeout, nouvelle tentative dans {attente}s...")
+                time.sleep(attente)
+                continue
+            except requests.exceptions.RequestException as e:
+                attente = 10 * (tentative + 1)
+                print(f"    Erreur réseau ({e}), nouvelle tentative dans {attente}s...")
+                time.sleep(attente)
+                continue
+        if not succes:
+            raise RuntimeError(f"Échec après 5 tentatives sur {source_label} {cursor}-{fin_tranche}")
+
+        df_t = pd.DataFrame(r.json()["daily"])
+        morceaux.append(df_t)
+        print(f"    {cursor} → {fin_tranche} ok ({len(df_t)} jours)")
+        cursor = fin_tranche + timedelta(days=1)
+        time.sleep(1.5)
+    df_full = pd.concat(morceaux, ignore_index=True)
+    df_full["source"] = source_label
+    return df_full
+
+
+# =============================================================================
+# 3. STRATÉGIE INCRÉMENTALE — ne télécharger que ce qui manque
+# =============================================================================
+print("ÉTAPE 1/6 — Stratégie incrémentale")
+
+if Path(FICHIER_BRUTES).exists():
+    df_existant = pd.read_parquet(FICHIER_BRUTES)
+    df_existant["time"] = pd.to_datetime(df_existant["time"])
+    derniere_date = df_existant["time"].max().date()
+    print(f"  Fichier existant trouvé : {len(df_existant)} jours, jusqu'au {derniere_date}")
+else:
+    df_existant = pd.DataFrame()
+    derniere_date = None
+    print(f"  Aucun fichier existant — premier téléchargement complet")
+
+# Ce qu'il faut télécharger
+nouveaux_morceaux = []
+
+if derniere_date is None:
+    # Premier lancement : tout télécharger
+    df_era5 = telecharger_periode(
+        "https://archive-api.open-meteo.com/v1/archive",
+        DATE_DEBUT_HISTOIRE,
+        DATE_BASCULE_ERA5_AROME - timedelta(days=1),
+        "ERA5",
+        mois_par_tranche=6,
+    )
+    df_arome = telecharger_periode(
+        "https://historical-forecast-api.open-meteo.com/v1/forecast",
+        DATE_BASCULE_ERA5_AROME,
+        DATE_FIN,
+        "AROME-1km",
+        mois_par_tranche=12,
+    )
+    nouveaux_morceaux = [df_era5, df_arome]
+else:
+    # Lancement suivant : on ne complète qu'à partir de la dernière date
+    debut_complement = derniere_date + timedelta(days=1)
+    if debut_complement > DATE_FIN:
+        print(f"  Données déjà à jour ({derniere_date}). Rien à télécharger.")
+    else:
+        # Partie ERA5 manquante (rare, sauf si fichier ancien)
+        if debut_complement < DATE_BASCULE_ERA5_AROME:
+            df_era5 = telecharger_periode(
+                "https://archive-api.open-meteo.com/v1/archive",
+                debut_complement,
+                min(DATE_BASCULE_ERA5_AROME - timedelta(days=1), DATE_FIN),
+                "ERA5",
+                mois_par_tranche=6,
+            )
+            nouveaux_morceaux.append(df_era5)
+            debut_complement = DATE_BASCULE_ERA5_AROME
+        # Partie AROME manquante
+        if debut_complement <= DATE_FIN:
+            df_arome = telecharger_periode(
+                "https://historical-forecast-api.open-meteo.com/v1/forecast",
+                debut_complement,
+                DATE_FIN,
+                "AROME-1km",
+                mois_par_tranche=12,
+            )
+            nouveaux_morceaux.append(df_arome)
+
+# Fusion
+if nouveaux_morceaux:
+    df_nouveau = pd.concat(nouveaux_morceaux, ignore_index=True)
+    df_nouveau["time"] = pd.to_datetime(df_nouveau["time"])
+    if not df_existant.empty:
+        df_brut = pd.concat([df_existant, df_nouveau], ignore_index=True)
+        df_brut = df_brut.drop_duplicates(subset=["time"], keep="first")
+    else:
+        df_brut = df_nouveau
+    df_brut = df_brut.sort_values("time").reset_index(drop=True)
+    # Sauvegarde incrémentale
+    df_brut.to_parquet(FICHIER_BRUTES, index=False)
+    print(f"  Sauvegarde brute mise à jour : {len(df_brut)} jours total")
+else:
+    df_brut = df_existant
+
+df = df_brut.copy()
+print(f"  Total après mise à jour : {len(df)} jours sur {df['time'].dt.year.nunique()} années")
 print()
 
 # =============================================================================
-# 3. RENOMMAGE & VARIABLES DÉRIVÉES DE BASE
+# 4. RENOMMAGE & VARIABLES DÉRIVÉES
 # =============================================================================
-print("ÉTAPE 2/6 — Préparation des données brutes")
+print("ÉTAPE 2/6 — Préparation des données")
 
 df = df.rename(columns={
     "time": "Date",
@@ -153,7 +231,6 @@ df = df.rename(columns={
     "source": "Source",
 })
 
-# Conversions
 df["Insolation_h"] = (df["Insolation_s"] / 3600).round(2)
 df.drop(columns=["Insolation_s"], inplace=True)
 df["Amplitude_thermique"] = (df["T_max"] - df["T_min"]).round(2)
@@ -164,26 +241,25 @@ df["Jour"] = df["Date"].dt.day
 df["Jour_julien"] = df["Date"].dt.dayofyear
 df["Semaine_ISO"] = df["Date"].dt.isocalendar().week.astype(int)
 
-# Compteurs binaires
 df["Jour_gel"] = (df["T_min"] <= 0).astype(int)
 df["Jour_gel_severe"] = (df["T_min"] <= -2).astype(int)
 df["Jour_gel_destructeur"] = (df["T_min"] <= -4).astype(int)
 df["Jour_chaud_25"] = (df["T_max"] >= 25).astype(int)
 df["Jour_chaud_30"] = (df["T_max"] >= 30).astype(int)
 df["Jour_chaud_35"] = (df["T_max"] >= 35).astype(int)
-df["Jour_tropical"] = (df["T_min"] >= 20).astype(int)  # nuit chaude
+df["Jour_tropical"] = (df["T_min"] >= 20).astype(int)
 df["Jour_pluvieux"] = (df["RR"] >= 1).astype(int)
 df["Jour_pluvieux_fort"] = (df["RR"] >= 20).astype(int)
 df["Jour_sec"] = (df["RR"] < 0.5).astype(int)
 
+
 # =============================================================================
-# 4. INDICES VITICOLES — JOURNALIERS
+# 5. INDICES VITICOLES JOURNALIERS
 # =============================================================================
-print("ÉTAPE 3/6 — Calcul des indices viticoles journaliers")
+print("ÉTAPE 3/6 — Indices viticoles journaliers")
 
 
 def coef_huglin_lat(lat):
-    """Coefficient K de Huglin pour la longueur du jour selon la latitude."""
     if lat <= 40: return 1.00
     if lat <= 42: return 1.02
     if lat <= 44: return 1.03
@@ -197,16 +273,13 @@ K_HUGLIN = coef_huglin_lat(LATITUDE)
 df["GDD_base10"] = ((df["T_moy"] - 10).clip(lower=0)).round(2)
 df["GDD_base5"] = ((df["T_moy"] - 5).clip(lower=0)).round(2)
 df["GDD_base0"] = df["T_moy"].clip(lower=0).round(2)
-
-# Contributions journalières
 df["Contrib_Winkler"] = df["GDD_base10"]
 df["Contrib_Huglin"] = (
     ((df["T_moy"] - 10).clip(lower=0) + (df["T_max"] - 10).clip(lower=0)) / 2 * K_HUGLIN
 ).round(2)
-df["Contrib_GFV"] = df["GDD_base0"]  # GFV : base 0°C depuis 1er janv
-df["Contrib_BBCH"] = df["GDD_base5"]  # somme base 5°C pour modèle débourrement
+df["Contrib_GFV"] = df["GDD_base0"]
+df["Contrib_BBCH"] = df["GDD_base5"]
 
-# Cumuls par campagne (1er avril → 31 octobre, sauf GFV qui démarre 1er janv)
 df["Winkler_cumul"] = 0.0
 df["Huglin_cumul"] = 0.0
 df["GFV_cumul"] = 0.0
@@ -228,14 +301,10 @@ for an in df["Annee"].unique():
 
 df["Bilan_hydrique_cumul"] = (df["RR_cumul_campagne"] - df["ETP_cumul_campagne"]).round(1)
 
-# =============================================================================
-# 5. RÉSERVE FACILEMENT UTILISABLE (RFU) — modèle simple
-# =============================================================================
-# Capacité au champ ~150 mm pour sols argilo-calcaires de Vouvray.
-# Modèle : RFU(j) = min(RFU_max, RFU(j-1) + RR(j) - ETP(j))
+# RFU
 RFU_MAX = 150.0
 df["RFU_mm"] = 0.0
-rfu = RFU_MAX  # sol plein en hiver
+rfu = RFU_MAX
 for i in range(len(df)):
     bilan = (df.iloc[i]["RR"] or 0) - (df.iloc[i]["ETP"] or 0)
     rfu = max(0.0, min(RFU_MAX, rfu + bilan))
@@ -246,13 +315,12 @@ df["Stress_hydrique"] = pd.cut(
     labels=["Sévère", "Modéré", "Léger", "Aucun"]
 ).astype(str)
 
-# =============================================================================
-# 6. RISQUES SANITAIRES — modèles épidémiologiques
-# =============================================================================
-print("ÉTAPE 4/6 — Calcul des risques sanitaires")
 
-# --- MILDIOU (modèle Goidanich simplifié) ---
-# Conditions favorables : T_moy entre 10 et 25°C, RR cumulée 48h ≥ 10mm, HR moy ≥ 75%
+# =============================================================================
+# 6. RISQUES SANITAIRES
+# =============================================================================
+print("ÉTAPE 4/6 — Risques sanitaires")
+
 df["RR_48h"] = df["RR"].rolling(2, min_periods=1).sum()
 df["Mildiou_score"] = (
     ((df["T_moy"] >= 10) & (df["T_moy"] <= 25)).astype(int)
@@ -264,20 +332,15 @@ df["Mildiou_risque"] = pd.cut(
     labels=["Nul", "Faible", "Modéré", "Élevé"]
 ).astype(str)
 
-# --- OÏDIUM (modèle Gubler-Thomas simplifié) ---
-# Risque si plusieurs jours consécutifs avec T_max entre 21-30°C et HR > 60%
 df["Oidium_jour_favorable"] = (
     (df["T_max"] >= 21) & (df["T_max"] <= 30) & (df["HR_moy"] >= 60)
 ).astype(int)
-# Score : nb de jours favorables sur les 7 derniers
 df["Oidium_score"] = df["Oidium_jour_favorable"].rolling(7, min_periods=1).sum()
 df["Oidium_risque"] = pd.cut(
     df["Oidium_score"], bins=[-1, 2, 4, 6, 7],
     labels=["Faible", "Modéré", "Élevé", "Très élevé"]
 ).astype(str)
 
-# --- BOTRYTIS (modèle simple pré-vendange) ---
-# Risque proportionnel à HR moy + RR sur 7 jours, surtout août-septembre
 df["RR_7j"] = df["RR"].rolling(7, min_periods=1).sum()
 df["Botrytis_score"] = (
     ((df["HR_moy"] >= 80).astype(int) * 2)
@@ -289,13 +352,8 @@ df["Botrytis_risque"] = pd.cut(
     labels=["Faible", "Modéré", "Élevé", "Très élevé"]
 ).astype(str)
 
-# --- ÉCHAUDAGE (canicule × stress hydrique) ---
 df["Echaudage_jour"] = ((df["T_max"] >= 35) & (df["RFU_mm"] < 60)).astype(int)
 
-# =============================================================================
-# 7. FENÊTRES DE TRAITEMENT & JOURS REMARQUABLES
-# =============================================================================
-# Fenêtre traitement OK : pas de pluie aujourd'hui ni demain, vent < 30 km/h, HR < 85%
 df["RR_demain"] = df["RR"].shift(-1).fillna(0)
 df["Fenetre_traitement_OK"] = (
     (df["RR"] < 1) & (df["RR_demain"] < 2) &
@@ -303,32 +361,23 @@ df["Fenetre_traitement_OK"] = (
 ).astype(int)
 df.drop(columns=["RR_demain"], inplace=True)
 
-# Jours idéaux maturation : T_max 22-28°C, T_min 12-18°C, sec, août-septembre
 df["Jour_ideal_maturation"] = (
     (df["Mois"].isin([8, 9])) & (df["T_max"] >= 22) & (df["T_max"] <= 28) &
     (df["T_min"] >= 12) & (df["T_min"] <= 18) & (df["RR"] < 1)
 ).astype(int)
-
-# Jours idéaux vendange : T_moy 15-22°C, sec, HR matin élevée
 df["Jour_ideal_vendange"] = (
     (df["T_moy"] >= 15) & (df["T_moy"] <= 22) &
     (df["RR"] < 0.5) & (df["HR_max"] >= 85)
 ).astype(int)
+df["Gel_printanier"] = ((df["Mois"].isin([3, 4, 5])) & (df["T_min"] <= 0)).astype(int)
+df["Gel_printanier_severe"] = ((df["Mois"].isin([3, 4, 5])) & (df["T_min"] <= -2)).astype(int)
 
-# Gel printanier (mars-mai) : critique pour la vigne post-débourrement
-df["Gel_printanier"] = (
-    (df["Mois"].isin([3, 4, 5])) & (df["T_min"] <= 0)
-).astype(int)
-df["Gel_printanier_severe"] = (
-    (df["Mois"].isin([3, 4, 5])) & (df["T_min"] <= -2)
-).astype(int)
 
 # =============================================================================
-# 8. SYNTHÈSES MENSUELLES & ANNUELLES
+# 7. SYNTHÈSES
 # =============================================================================
-print("ÉTAPE 5/6 — Synthèses mensuelles et fiches millésime")
+print("ÉTAPE 5/6 — Synthèses mensuelles, annuelles, décennies")
 
-# Synthèse mensuelle
 synthese_mens = df.groupby(["Annee", "Mois"]).agg(**{
     "T_min_moy": ("T_min", "mean"),
     "T_max_moy": ("T_max", "mean"),
@@ -355,7 +404,6 @@ synthese_mens = df.groupby(["Annee", "Mois"]).agg(**{
     "Fenetres_traitement": ("Fenetre_traitement_OK", "sum"),
 }).round(1).reset_index()
 
-# Normales mensuelles 1991-2020
 masque_normale = (df["Annee"] >= NORMALE_DEBUT) & (df["Annee"] <= NORMALE_FIN)
 normales_mens = df[masque_normale].groupby("Mois").agg(**{
     "T_min_normale": ("T_min", "mean"),
@@ -370,7 +418,6 @@ for col in ["RR_normale", "ETP_normale", "Insolation_normale_h"]:
     normales_mens[col] = (normales_mens[col] / nb_annees_normales).round(1)
 normales_mens = normales_mens.reset_index()
 
-# Fiches millésime annuelles
 fiches = []
 for an in sorted(df["Annee"].unique()):
     sous = df[df["Annee"] == an]
@@ -387,14 +434,9 @@ for an in sorted(df["Annee"].unique()):
     etp_camp = fenetre_camp["ETP"].sum()
     pluie_an = sous["RR"].sum()
     amplitude_aout = aout["Amplitude_thermique"].mean() if len(aout) else None
-
-    # Indice Riou : bilan hydrique potentiel sur la campagne
     riou = round(pluie_camp - etp_camp, 1)
-
-    # Selianinov : (∑P / Winkler) × 10
     selianinov = round((pluie_camp / winkler * 10), 2) if winkler > 0 else None
 
-    # Classes Tonietto / Winkler
     if huglin < 1500: classe_huglin = "Très frais"
     elif huglin < 1800: classe_huglin = "Frais"
     elif huglin < 2100: classe_huglin = "Tempéré"
@@ -447,7 +489,6 @@ for an in sorted(df["Annee"].unique()):
     })
 df_millesimes = pd.DataFrame(fiches)
 
-# Décennies (pour la page "50 ans")
 df["Decennie"] = (df["Annee"] // 10) * 10
 synthese_dec = df.groupby("Decennie").agg(**{
     "T_moy_decennie": ("T_moy", "mean"),
@@ -458,22 +499,21 @@ synthese_dec = df.groupby("Decennie").agg(**{
     "Nuits_tropicales_an_moy": ("Jour_tropical", lambda s: s.sum() / (s.index.size / 365.25)),
 }).round(2).reset_index()
 
+
 # =============================================================================
-# 9. LECTURE DU GOOGLE SHEET (saisies terrain)
+# 8. GOOGLE SHEET
 # =============================================================================
-print("ÉTAPE 6/6 — Lecture du Google Sheet de saisies terrain")
+print("ÉTAPE 6/6 — Lecture du Google Sheet")
 
 
 def lire_gsheet_onglet(sheet_id, nom_onglet):
-    """Lit un onglet d'un Google Sheet public en CSV."""
     url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={nom_onglet}"
     try:
         r = requests.get(url, timeout=30)
         r.raise_for_status()
-        df_g = pd.read_csv(io.StringIO(r.text))
-        return df_g
+        return pd.read_csv(io.StringIO(r.text))
     except Exception as e:
-        print(f"  ⚠️  Impossible de lire l'onglet '{nom_onglet}' : {e}")
+        print(f"  ⚠️  Onglet '{nom_onglet}' non lu : {e}")
         return pd.DataFrame()
 
 
@@ -482,8 +522,9 @@ df_observations = lire_gsheet_onglet(GSHEET_ID, "observations")
 print(f"  Phénologie : {len(df_phenologie)} lignes")
 print(f"  Observations : {len(df_observations)} lignes")
 
+
 # =============================================================================
-# 10. ONGLET README / MÉTADONNÉES
+# 9. README & ÉCRITURE EXCEL
 # =============================================================================
 readme = [
     ["Domaine", NOM_DOMAINE],
@@ -491,52 +532,48 @@ readme = [
     ["Coordonnées GPS", f"{LATITUDE}°N, {LONGITUDE}°E"],
     ["", ""],
     ["SOURCES DE DONNÉES", ""],
-    ["1975 → 2020", "ERA5 (Copernicus / ECMWF) — réanalyse climatique mondiale, 9 km"],
+    ["1975 → 2020", "ERA5 (Copernicus / ECMWF) — 9 km, réanalyse climatique mondiale"],
     ["2021 → aujourd'hui", "AROME 1 km — modèle haute résolution Météo-France"],
     ["Accès", "Open-Meteo (gratuit, sans clé API)"],
     ["", ""],
     ["MISE À JOUR", "Quotidienne automatique via GitHub Actions"],
+    ["Stockage incrémental", "Fichier parquet local — ne télécharge que les nouveaux jours"],
     ["Dernière exécution", date.today().isoformat()],
-    ["Période couverte", f"{DATE_DEBUT_HISTOIRE} → {DATE_FIN}"],
+    ["Période couverte", f"{df['Date'].min().date()} → {df['Date'].max().date()}"],
     ["Nombre total de jours", str(len(df))],
     ["Nombre d'années", str(df["Annee"].nunique())],
     ["", ""],
     ["NORMALES CLIMATIQUES", f"{NORMALE_DEBUT}-{NORMALE_FIN} (standard OMM)"],
     ["", ""],
-    ["INDICES VITICOLES CALCULÉS", ""],
+    ["INDICES VITICOLES", ""],
     ["Huglin", "Σ [(Tmoy-10)+(Tmax-10)]/2 × K_lat, du 01/04 au 30/09"],
     ["Winkler (GDD)", "Σ max(0, Tmoy-10), du 01/04 au 31/10"],
     ["Fraîcheur des Nuits (IF)", "Moyenne des Tmin de septembre (Tonietto 1999)"],
-    ["GFV Parker", "Σ Tmoy base 0°C depuis 01/01 — prédit floraison/véraison"],
+    ["GFV Parker", "Σ Tmoy base 0°C depuis 01/01"],
     ["GSR", "Σ Tmoy base 0°C de la véraison à la maturité"],
     ["BBCH base 5°C", "Cumul T° pour modélisation débourrement"],
-    ["Riou (sécheresse)", "Bilan hydrique campagne avril-septembre"],
+    ["Riou (sécheresse)", "Bilan hydrique avril-septembre"],
     ["Selianinov", "(ΣP campagne / Winkler) × 10"],
     ["", ""],
     ["RISQUES SANITAIRES", ""],
-    ["Mildiou", "Modèle Goidanich simplifié : T° + RR cumulée 48h + HR"],
-    ["Oïdium", "Modèle Gubler-Thomas : nb jours favorables sur 7 derniers"],
-    ["Botrytis", "Score HR + RR 7j + T° favorable, focus pré-vendange"],
+    ["Mildiou", "Modèle Goidanich simplifié"],
+    ["Oïdium", "Modèle Gubler-Thomas"],
+    ["Botrytis", "Score HR + RR 7j + T° favorable"],
     ["Échaudage", "T_max ≥ 35°C avec RFU < 60mm"],
     ["", ""],
     ["BILAN HYDRIQUE", ""],
     ["RFU max", f"{RFU_MAX} mm (sols argilo-calcaires Vouvray)"],
-    ["Stress hydrique", "Sévère <30, Modéré 30-60, Léger 60-100, Aucun >100"],
     ["", ""],
     ["GOOGLE SHEET — saisies terrain", ""],
-    ["Lien (lecture)", f"https://docs.google.com/spreadsheets/d/{GSHEET_ID}"],
-    ["Onglet phénologie", f"{len(df_phenologie)} millésimes saisis"],
-    ["Onglet observations", f"{len(df_observations)} observations terrain"],
+    ["Lien", f"https://docs.google.com/spreadsheets/d/{GSHEET_ID}"],
+    ["Phénologie", f"{len(df_phenologie)} millésimes saisis"],
+    ["Observations", f"{len(df_observations)} observations terrain"],
 ]
 df_readme = pd.DataFrame(readme, columns=["Élément", "Valeur"])
 
-# =============================================================================
-# 11. ÉCRITURE EXCEL MULTI-ONGLETS
-# =============================================================================
 print()
 print(f"Écriture du fichier {FICHIER_EXCEL}...")
 
-# Colonnes à exporter, organisées
 COLS_BRUTES = [
     "Date", "Source", "Annee", "Mois", "Jour", "Jour_julien", "Semaine_ISO",
     "T_min", "T_max", "T_moy", "Amplitude_thermique",
@@ -584,7 +621,5 @@ with pd.ExcelWriter(FICHIER_EXCEL, engine="openpyxl") as writer:
 
 print()
 print(f"✅ Terminé. {len(df)} jours sur {df['Annee'].nunique()} années.")
-print(f"   Fichier : {FICHIER_EXCEL}")
-print(f"   Onglets : README, Millesimes, Decennies_50ans, Synthese_mensuelle,")
-print(f"             Normales_1991_2020, Phenologie_terrain, Observations_terrain,")
-print(f"             Risques_J, Indices_J, Donnees_brutes_J")
+print(f"   Fichier brut : {FICHIER_BRUTES} (incrémental)")
+print(f"   Fichier Excel : {FICHIER_EXCEL}")
