@@ -23,6 +23,9 @@ from pathlib import Path
 
 import pandas as pd
 import requests
+import sys
+import functools
+print = functools.partial(print, flush=True)
 
 # =============================================================================
 # 1. PARAMÈTRES DU DOMAINE
@@ -30,7 +33,7 @@ import requests
 LATITUDE = 47.4308
 LONGITUDE = 0.9572
 NOM_DOMAINE = "Clos Thierrière"
-DATE_DEBUT_HISTOIRE = date(1975, 1, 1)
+DATE_DEBUT_HISTOIRE = date(1990, 1, 1)
 DATE_BASCULE_ERA5_AROME = date(2021, 1, 1)
 DATE_FIN = date.today() - timedelta(days=1)
 FICHIER_EXCEL = "clos_thierriere_climato.xlsx"
