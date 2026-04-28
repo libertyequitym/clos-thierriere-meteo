@@ -37,5 +37,6 @@ jobs:
           [ -f clos_thierriere_climato.xlsx ] && git add clos_thierriere_climato.xlsx || true
           [ -f donnees_brutes.parquet ] && git add donnees_brutes.parquet || true
           [ -f donnees_tours.parquet ] && git add donnees_tours.parquet || true
+          [ -d docs ] && git add docs/ || true
           git diff --staged --quiet || git commit -m "MAJ météo automatique $(date +%Y-%m-%d)"
           git push
