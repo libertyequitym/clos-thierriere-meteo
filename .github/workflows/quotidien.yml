@@ -27,10 +27,10 @@ jobs:
 
       - name: Lancer le robot météo
         env:
-             METEOFRANCE_API_KEY: ${{ secrets.METEOFRANCE_API_KEY }}
-           run: python update_meteo.py
+          METEOFRANCE_API_KEY: ${{ secrets.METEOFRANCE_API_KEY }}
+        run: python update_meteo.py
 
-      - name: Sauvegarder le fichier Excel mis à jour
+      - name: Sauvegarder les fichiers mis à jour
         run: |
           git config user.name "robot-meteo"
           git config user.email "robot@closthierriere.fr"
