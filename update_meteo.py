@@ -187,7 +187,7 @@ print()
 print("ÉTAPE 2/7 — Tours-Saint-Symphorien (Météo-France DPClim)")
 
 def telecharger_tours_dpclim(debut, fin):
-    """Télécharge les données quotidiennes Tours-Saint-Symphorien via API DPClim."""
+    """Télécharge les données quotidiennes Tours via API DPClim."""
     if not METEOFRANCE_API_KEY:
         print("  ⚠️  Pas de clé Météo-France — Tours non téléchargé")
         return pd.DataFrame()
@@ -196,27 +196,31 @@ def telecharger_tours_dpclim(debut, fin):
     print(f"  Tours-St-Symphorien : {debut} → {fin}")
     base_url = "https://public-api.meteofrance.fr/public/DPClim/v1"
     headers = {
-        "Authorization": f"Bearer {METEOFRANCE_API_KEY}",
-        "Accept": "*/*",
+        "apikey": METEOFRANCE_API_KEY,
+        "accept": "*/*",
     }
     cmd_url = f"{base_url}/commande-station/quotidienne"
     cmd_params = {
         "id-station": TOURS_STATION_ID,
         "date-deb-periode": f"{debut.isoformat()}T00:00:00Z",
-        "date-fin-periode": f"{fin.isoformat()}T00:00:00Z",
+        "date-fin-periode": f"{fin.isoformat()}T23:59:59Z",
     }
     try:
         r = requests.get(cmd_url, params=cmd_params, headers=headers, timeout=60)
         if r.status_code == 401:
-            print(f"  ⚠️  Auth refusée (401) — vérifie la clé Météo-France")
+            print(f"  ⚠️  Auth refusée (401). Réponse : {r.text[:300]}")
             return pd.DataFrame()
         if r.status_code == 403:
-            print(f"  ⚠️  Accès refusé (403) — vérifie l'abonnement DPClim")
+            print(f"  ⚠️  Accès refusé (403). Réponse : {r.text[:300]}")
             return pd.DataFrame()
+        if r.status_code == 429:
+            print(f"  ⚠️  Quota atteint (429), pause 65s")
+            time.sleep(65)
+            r = requests.get(cmd_url, params=cmd_params, headers=headers, timeout=60)
         r.raise_for_status()
         cmd_id = r.json().get("elaboreProduitAvecDemandeResponse", {}).get("return", "")
         if not cmd_id:
-            print(f"  ⚠️  Pas d'ID de commande retourné. Réponse : {r.text[:200]}")
+            print(f"  ⚠️  Pas d'ID commande. Réponse : {r.text[:300]}")
             return pd.DataFrame()
         print(f"    Commande {cmd_id} créée, attente du fichier...")
     except Exception as e:
@@ -229,15 +233,15 @@ def telecharger_tours_dpclim(debut, fin):
         time.sleep(10)
         try:
             r = requests.get(fichier_url, params={"id-cmde": cmd_id}, headers=headers, timeout=120)
-            if r.status_code == 204:
-                print(f"    Pas encore prêt (204), attente...")
-                continue
-            if r.status_code == 200:
+            if r.status_code in (200, 201):
                 csv_text = r.text
                 print(f"    ✅ Fichier reçu ({len(csv_text)} caractères)")
                 break
+            if r.status_code == 204:
+                print(f"    Pas encore prêt (204), attente...")
+                continue
             if r.status_code == 410:
-                print(f"    Fichier expiré (410). Abandon de cette tranche.")
+                print(f"    Production déjà livrée (410). Abandon.")
                 return pd.DataFrame()
             if r.status_code in (404, 500, 507):
                 print(f"    Statut {r.status_code}, retry...")
@@ -258,6 +262,8 @@ def telecharger_tours_dpclim(debut, fin):
             df_t["date"] = pd.to_datetime(df_t["date"], format="%Y%m%d", errors="coerce")
             df_t = df_t.dropna(subset=["date"])
         print(f"    ✅ {len(df_t)} lignes Tours parsées")
+        # Pause respecter la limite 50 req/min
+        time.sleep(2)
         return df_t
     except Exception as e:
         print(f"  ⚠️  Erreur parsing CSV Tours : {e}")
