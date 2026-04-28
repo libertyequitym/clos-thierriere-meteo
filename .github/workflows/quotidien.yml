@@ -26,12 +26,14 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Lancer le robot météo
-        run: python update_meteo.py
+        env:
+             METEOFRANCE_API_KEY: ${{ secrets.METEOFRANCE_API_KEY }}
+           run: python update_meteo.py
 
       - name: Sauvegarder le fichier Excel mis à jour
         run: |
           git config user.name "robot-meteo"
           git config user.email "robot@closthierriere.fr"
-          git add clos_thierriere_climato.xlsx donnees_brutes.parquet
+          git add clos_thierriere_climato.xlsx donnees_brutes.parquet donnees_tours.parquet
           git diff --staged --quiet || git commit -m "MAJ météo automatique $(date +%Y-%m-%d)"
           git push
