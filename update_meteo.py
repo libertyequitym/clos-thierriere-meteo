@@ -195,9 +195,10 @@ def telecharger_tours_dpclim(debut, fin):
         return pd.DataFrame()
     print(f"  Tours-St-Symphorien : {debut} → {fin}")
     base_url = "https://public-api.meteofrance.fr/public/DPClim/v1"
-    headers = {"apikey": METEOFRANCE_API_KEY, "Accept": "application/json"}
-    
-    # 1) Lancer la commande de téléchargement
+    headers = {
+        "Authorization": f"Bearer {METEOFRANCE_API_KEY}",
+        "Accept": "*/*",
+    }
     cmd_url = f"{base_url}/commande-station/quotidienne"
     cmd_params = {
         "id-station": TOURS_STATION_ID,
@@ -206,50 +207,57 @@ def telecharger_tours_dpclim(debut, fin):
     }
     try:
         r = requests.get(cmd_url, params=cmd_params, headers=headers, timeout=60)
+        if r.status_code == 401:
+            print(f"  ⚠️  Auth refusée (401) — vérifie la clé Météo-France")
+            return pd.DataFrame()
+        if r.status_code == 403:
+            print(f"  ⚠️  Accès refusé (403) — vérifie l'abonnement DPClim")
+            return pd.DataFrame()
         r.raise_for_status()
         cmd_id = r.json().get("elaboreProduitAvecDemandeResponse", {}).get("return", "")
         if not cmd_id:
-            print("  ⚠️  Pas d'ID de commande retourné")
+            print(f"  ⚠️  Pas d'ID de commande retourné. Réponse : {r.text[:200]}")
             return pd.DataFrame()
         print(f"    Commande {cmd_id} créée, attente du fichier...")
     except Exception as e:
         print(f"  ⚠️  Erreur commande Tours : {e}")
         return pd.DataFrame()
-    
-    # 2) Récupérer le fichier (peut prendre 10-60s côté serveur)
+
     fichier_url = f"{base_url}/commande/fichier"
     csv_text = None
-    for tentative in range(20):
-        time.sleep(8)
+    for tentative in range(15):
+        time.sleep(10)
         try:
             r = requests.get(fichier_url, params={"id-cmde": cmd_id}, headers=headers, timeout=120)
             if r.status_code == 204:
-                continue  # pas encore prêt
+                print(f"    Pas encore prêt (204), attente...")
+                continue
             if r.status_code == 200:
                 csv_text = r.text
+                print(f"    ✅ Fichier reçu ({len(csv_text)} caractères)")
                 break
-            if r.status_code in (404, 410, 500, 507):
+            if r.status_code == 410:
+                print(f"    Fichier expiré (410). Abandon de cette tranche.")
+                return pd.DataFrame()
+            if r.status_code in (404, 500, 507):
                 print(f"    Statut {r.status_code}, retry...")
                 continue
-            r.raise_for_status()
         except Exception as e:
             print(f"    Erreur récupération : {e}")
             continue
     if not csv_text:
-        print("  ⚠️  Fichier Tours non récupéré après 20 tentatives")
+        print("  ⚠️  Fichier Tours non récupéré, on continue sans")
         return pd.DataFrame()
-    
-    # 3) Parser le CSV
+
     try:
         df_t = pd.read_csv(io.StringIO(csv_text), sep=";", decimal=",")
-        # Renommer les colonnes communes
         rename_map = {"DATE": "date", "TN": "T_min_obs", "TX": "T_max_obs",
-                      "TM": "T_moy_obs", "RR": "RR_obs", "FFM": "Vent_obs"}
+                      "TM": "T_moy_obs", "RR": "RR_obs"}
         df_t = df_t.rename(columns={k: v for k, v in rename_map.items() if k in df_t.columns})
         if "date" in df_t.columns:
             df_t["date"] = pd.to_datetime(df_t["date"], format="%Y%m%d", errors="coerce")
             df_t = df_t.dropna(subset=["date"])
-        print(f"    ✅ {len(df_t)} lignes Tours téléchargées")
+        print(f"    ✅ {len(df_t)} lignes Tours parsées")
         return df_t
     except Exception as e:
         print(f"  ⚠️  Erreur parsing CSV Tours : {e}")
