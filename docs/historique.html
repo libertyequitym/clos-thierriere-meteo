@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Historique — Clos Thierrière</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --vert-sauge: #536158;
+  --vert-sauge-clair: #6B7B71;
+  --vert-sauge-fonce: #3D4942;
+  --creme: #F5F1E8;
+  --creme-fonce: #E8E2D2;
+  --ocre: #D4A93B;
+  --bordeaux: #7A2E2E;
+  --noir-doux: #2A2A2A;
+  --gris: #8A857A;
+  --blanc: #FDFCF8;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 300;
+  background: var(--creme);
+  color: var(--noir-doux);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono { font-family: 'JetBrains Mono', 'Courier New', monospace; }
+
+a { color: var(--vert-sauge); text-decoration: none; border-bottom: 1px solid transparent; transition: all 0.2s; }
+a:hover { border-bottom-color: var(--vert-sauge); }
+
+/* HEADER */
+.header {
+  background: var(--vert-sauge);
+  color: var(--creme);
+  padding: 1rem 2rem;
+  border-bottom: 3px solid var(--ocre);
+}
+.header-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.logo {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+}
+.monogramme {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  background: var(--ocre);
+  color: var(--vert-sauge-fonce);
+  padding: 0.2rem 0.5rem;
+  border-radius: 2px;
+}
+.logo-titre { font-size: 1.1rem; font-weight: 400; letter-spacing: 0.05em; }
+.logo-soustitre { font-size: 0.75rem; opacity: 0.7; font-family: 'JetBrains Mono', monospace; }
+
+nav ul { list-style: none; display: flex; gap: 1.5rem; flex-wrap: wrap; }
+nav a {
+  color: var(--creme);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border-bottom: 1px solid transparent;
+}
+nav a:hover, nav a.active { border-bottom-color: var(--ocre); color: var(--ocre); }
+
+/* MAIN */
+main { max-width: 1200px; margin: 2rem auto; padding: 0 2rem; }
+.section { margin-bottom: 3rem; }
+.section-titre {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--vert-sauge);
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--vert-sauge);
+}
+h1 {
+  font-weight: 200;
+  font-size: 2.5rem;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.5rem;
+  color: var(--vert-sauge-fonce);
+}
+h2 {
+  font-weight: 300;
+  font-size: 1.5rem;
+  margin: 2rem 0 1rem;
+  color: var(--vert-sauge-fonce);
+}
+p { margin-bottom: 1rem; max-width: 70ch; }
+
+/* BANDEAU CHIFFRES-CLÉS */
+.bandeau-cles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  background: var(--blanc);
+  padding: 2rem;
+  border-radius: 4px;
+  border-left: 4px solid var(--ocre);
+  margin-bottom: 2rem;
+}
+.cle-bloc { text-align: center; padding: 0.5rem; }
+.cle-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--gris);
+  margin-bottom: 0.5rem;
+}
+.cle-valeur {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 2rem;
+  font-weight: 500;
+  color: var(--vert-sauge-fonce);
+  line-height: 1;
+}
+.cle-unite { font-size: 0.9rem; color: var(--gris); margin-left: 0.2rem; }
+
+/* CARTES */
+.cartes { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 1.5rem; }
+.carte {
+  background: var(--blanc);
+  padding: 1.5rem;
+  border-radius: 4px;
+  border-top: 3px solid var(--vert-sauge);
+}
+.carte h3 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--vert-sauge);
+  margin-bottom: 1rem;
+}
+.carte-valeur {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.8rem;
+  color: var(--vert-sauge-fonce);
+  margin-bottom: 0.5rem;
+}
+.carte-detail { font-size: 0.85rem; color: var(--gris); }
+
+/* TABLEAUX */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--blanc);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  margin: 1rem 0;
+}
+th {
+  background: var(--vert-sauge);
+  color: var(--creme);
+  padding: 0.7rem 1rem;
+  text-align: left;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.75rem;
+}
+td { padding: 0.6rem 1rem; border-bottom: 1px solid var(--creme-fonce); }
+tr:hover { background: var(--creme); }
+tr.highlight { background: rgba(212, 169, 59, 0.15); }
+
+/* BADGES */
+.badge {
+  display: inline-block;
+  padding: 0.2rem 0.7rem;
+  border-radius: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.badge-faible { background: #D4E5D9; color: #2D5A3D; }
+.badge-modere { background: #F2E4B8; color: #7A5C0E; }
+.badge-eleve { background: #F5C9A8; color: #8C4A1A; }
+.badge-tres-eleve { background: #F2B8B8; color: #7A2E2E; }
+.badge-info { background: var(--creme-fonce); color: var(--vert-sauge-fonce); }
+
+/* ALERTES */
+.alerte {
+  padding: 1rem 1.5rem;
+  border-radius: 4px;
+  margin: 1rem 0;
+  border-left: 4px solid;
+}
+.alerte-info { background: var(--blanc); border-left-color: var(--vert-sauge); }
+.alerte-attention { background: #FCF6E1; border-left-color: var(--ocre); }
+.alerte-danger { background: #F5DDDD; border-left-color: var(--bordeaux); color: var(--bordeaux); }
+
+/* CTA */
+.btn {
+  display: inline-block;
+  background: var(--vert-sauge);
+  color: var(--creme) !important;
+  padding: 0.8rem 1.5rem;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border: none;
+  transition: all 0.2s;
+}
+.btn:hover { background: var(--vert-sauge-fonce); border-bottom: none; }
+.btn-ocre { background: var(--ocre); color: var(--vert-sauge-fonce) !important; }
+.btn-ocre:hover { background: #B89230; }
+
+/* FOOTER */
+footer {
+  margin-top: 4rem;
+  padding: 2rem;
+  background: var(--vert-sauge-fonce);
+  color: var(--creme);
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+}
+footer .maj { color: var(--ocre); }
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .header-inner { flex-direction: column; align-items: flex-start; }
+  nav ul { flex-direction: column; gap: 0.5rem; }
+  h1 { font-size: 1.8rem; }
+  .cle-valeur { font-size: 1.5rem; }
+  main { padding: 0 1rem; }
+}
+
+/* GRAPHIQUES */
+.bar-chart { display: flex; flex-direction: column; gap: 0.3rem; margin: 1rem 0; }
+.bar-row { display: flex; align-items: center; gap: 0.5rem; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }
+.bar-label { width: 60px; color: var(--gris); }
+.bar-track { flex: 1; height: 16px; background: var(--creme-fonce); border-radius: 2px; overflow: hidden; position: relative; }
+.bar-fill { height: 100%; background: var(--vert-sauge); border-radius: 2px; transition: width 0.5s; }
+.bar-fill.chaud { background: var(--ocre); }
+.bar-fill.tres-chaud { background: var(--bordeaux); }
+.bar-value { width: 50px; text-align: right; color: var(--vert-sauge-fonce); }
+</style>
+</head>
+<body>
+<header class="header">
+  <div class="header-inner">
+    <div class="logo">
+      <span class="monogramme">CF</span>
+      <div>
+        <div class="logo-titre">Clos Thierrière</div>
+        <div class="logo-soustitre">Vouvray · Vernou-sur-Brenne</div>
+      </div>
+    </div>
+    <nav><ul><li><a href="index.html" class="">Accueil</a></li><li><a href="millesime.html" class="">Millésime</a></li><li><a href="historique.html" class="active">Historique</a></li><li><a href="risques.html" class="">Risques</a></li><li><a href="phenologie.html" class="">Phénologie</a></li><li><a href="methodologie.html" class="">Méthodologie</a></li></ul></nav>
+  </div>
+</header>
+<main>
+
+<div class="section">
+  <h1>35 millésimes</h1>
+  <p>Évolution des indices climatiques de 1990 à 2026.</p>
+</div>
+
+<div class="section">
+  <div class="section-titre">Indice Huglin par millésime</div>
+  <p style="margin-bottom: 1.5rem; color: var(--gris); font-size: 0.9rem;">
+    Huglin = potentiel héliothermique pour la maturité. Vert : tempéré.
+    Ocre : tempéré chaud (>2100). Bordeaux : chaud à très chaud (>2400).
+  </p>
+  <div class="bar-chart">
+    <div class="bar-row">
+      <span class="bar-label">1990</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 86.48373983739837%"></div></div>
+      <span class="bar-value">1888</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">1991</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 75.96544715447155%"></div></div>
+      <span class="bar-value">1681</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">1992</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 78.04878048780488%"></div></div>
+      <span class="bar-value">1722</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">1993</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 72.86585365853658%"></div></div>
+      <span class="bar-value">1620</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">1994</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 78.2520325203252%"></div></div>
+      <span class="bar-value">1726</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">1995</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 77.38821138211382%"></div></div>
+      <span class="bar-value">1709</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">1996</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 75.05081300813008%"></div></div>
+      <span class="bar-value">1663</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">1997</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 82.72357723577237%"></div></div>
+      <span class="bar-value">1814</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">1998</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 75.76219512195121%"></div></div>
+      <span class="bar-value">1677</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">1999</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 82.21544715447155%"></div></div>
+      <span class="bar-value">1804</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">2000</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 77.1849593495935%"></div></div>
+      <span class="bar-value">1705</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">2001</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 72.0528455284553%"></div></div>
+      <span class="bar-value">1604</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">2002</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 71.7479674796748%"></div></div>
+      <span class="bar-value">1598</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">2003</span>
+      <div class="bar-track"><div class="bar-fill chaud" style="width: 100.0%"></div></div>
+      <span class="bar-value">2154</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">2004</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 82.3170731707317%"></div></div>
+      <span class="bar-value">1806</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">2005</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 89.22764227642277%"></div></div>
+      <span class="bar-value">1942</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">2006</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 91.41260162601627%"></div></div>
+      <span class="bar-value">1985</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">2007</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 76.42276422764228%"></div></div>
+      <span class="bar-value">1690</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">2008</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 72.66260162601627%"></div></div>
+      <span class="bar-value">1616</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">2009</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 85.0609756097561%"></div></div>
+      <span class="bar-value">1860</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">2010</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 79.6239837398374%"></div></div>
+      <span class="bar-value">1753</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">2011</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 87.04268292682927%"></div></div>
+      <span class="bar-value">1899</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">2012</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 75.50813008130082%"></div></div>
+      <span class="bar-value">1672</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">2013</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 76.93089430894308%"></div></div>
+      <span class="bar-value">1700</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">2014</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 77.54065040650406%"></div></div>
+      <span class="bar-value">1712</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">2015</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 88.00813008130082%"></div></div>
+      <span class="bar-value">1918</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">2016</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 83.63821138211382%"></div></div>
+      <span class="bar-value">1832</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">2017</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 86.78861788617887%"></div></div>
+      <span class="bar-value">1894</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">2018</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 97.20528455284553%"></div></div>
+      <span class="bar-value">2099</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">2019</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 89.73577235772358%"></div></div>
+      <span class="bar-value">1952</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">2020</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 92.47967479674797%"></div></div>
+      <span class="bar-value">2006</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">2021</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 77.23577235772358%"></div></div>
+      <span class="bar-value">1706</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">2022</span>
+      <div class="bar-track"><div class="bar-fill chaud" style="width: 98.42479674796748%"></div></div>
+      <span class="bar-value">2123</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">2023</span>
+      <div class="bar-track"><div class="bar-fill chaud" style="width: 98.17073170731707%"></div></div>
+      <span class="bar-value">2118</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">2024</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 81.19918699186992%"></div></div>
+      <span class="bar-value">1784</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">2025</span>
+      <div class="bar-track"><div class="bar-fill chaud" style="width: 97.5609756097561%"></div></div>
+      <span class="bar-value">2106</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">2026</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 0.0%"></div></div>
+      <span class="bar-value">186</span>
+    </div></div>
+</div>
+
+<div class="section">
+  <div class="section-titre">Détail des 15 derniers millésimes</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Année</th><th>Huglin</th><th>Classe</th><th>T° moy.</th><th>Pluie</th><th>Gel print.</th><th>Jours 30°C+</th>
+      </tr>
+    </thead>
+    <tbody>
+    <tr class="">
+      <td><strong>2012</strong></td>
+      <td>1672</td>
+      <td>Frais</td>
+      <td>12.0°C</td>
+      <td>780 mm</td>
+      <td>4j</td>
+      <td>9j</td>
+    </tr>
+    <tr class="">
+      <td><strong>2013</strong></td>
+      <td>1700</td>
+      <td>Frais</td>
+      <td>11.8°C</td>
+      <td>760 mm</td>
+      <td>12j</td>
+      <td>6j</td>
+    </tr>
+    <tr class="">
+      <td><strong>2014</strong></td>
+      <td>1712</td>
+      <td>Frais</td>
+      <td>12.9°C</td>
+      <td>719 mm</td>
+      <td>4j</td>
+      <td>2j</td>
+    </tr>
+    <tr class="">
+      <td><strong>2015</strong></td>
+      <td>1918</td>
+      <td>Tempéré</td>
+      <td>13.0°C</td>
+      <td>559 mm</td>
+      <td>5j</td>
+      <td>23j</td>
+    </tr>
+    <tr class="">
+      <td><strong>2016</strong></td>
+      <td>1832</td>
+      <td>Tempéré</td>
+      <td>12.4°C</td>
+      <td>715 mm</td>
+      <td>5j</td>
+      <td>13j</td>
+    </tr>
+    <tr class="">
+      <td><strong>2017</strong></td>
+      <td>1894</td>
+      <td>Tempéré</td>
+      <td>12.6°C</td>
+      <td>612 mm</td>
+      <td>0j</td>
+      <td>16j</td>
+    </tr>
+    <tr class="">
+      <td><strong>2018</strong></td>
+      <td>2099</td>
+      <td>Tempéré</td>
+      <td>13.2°C</td>
+      <td>734 mm</td>
+      <td>5j</td>
+      <td>15j</td>
+    </tr>
+    <tr class="">
+      <td><strong>2019</strong></td>
+      <td>1952</td>
+      <td>Tempéré</td>
+      <td>13.0°C</td>
+      <td>728 mm</td>
+      <td>2j</td>
+      <td>17j</td>
+    </tr>
+    <tr class="">
+      <td><strong>2020</strong></td>
+      <td>2006</td>
+      <td>Tempéré</td>
+      <td>13.4°C</td>
+      <td>717 mm</td>
+      <td>0j</td>
+      <td>14j</td>
+    </tr>
+    <tr class="">
+      <td><strong>2021</strong></td>
+      <td>1706</td>
+      <td>Frais</td>
+      <td>12.0°C</td>
+      <td>769 mm</td>
+      <td>8j</td>
+      <td>5j</td>
+    </tr>
+    <tr class="">
+      <td><strong>2022</strong></td>
+      <td>2123</td>
+      <td>Tempéré chaud</td>
+      <td>13.6°C</td>
+      <td>576 mm</td>
+      <td>4j</td>
+      <td>22j</td>
+    </tr>
+    <tr class="">
+      <td><strong>2023</strong></td>
+      <td>2118</td>
+      <td>Tempéré chaud</td>
+      <td>13.6°C</td>
+      <td>727 mm</td>
+      <td>5j</td>
+      <td>29j</td>
+    </tr>
+    <tr class="">
+      <td><strong>2024</strong></td>
+      <td>1784</td>
+      <td>Frais</td>
+      <td>12.8°C</td>
+      <td>956 mm</td>
+      <td>1j</td>
+      <td>10j</td>
+    </tr>
+    <tr class="">
+      <td><strong>2025</strong></td>
+      <td>2106</td>
+      <td>Tempéré chaud</td>
+      <td>13.2°C</td>
+      <td>755 mm</td>
+      <td>2j</td>
+      <td>32j</td>
+    </tr>
+    <tr class="highlight">
+      <td><strong>2026</strong></td>
+      <td>186</td>
+      <td>Très frais</td>
+      <td>9.4°C</td>
+      <td>203 mm</td>
+      <td>2j</td>
+      <td>0j</td>
+    </tr></tbody>
+  </table>
+</div>
+
+<div class="section">
+  <div class="section-titre">Tendance sur les décennies</div>
+  <table>
+    <thead><tr><th>Décennie</th><th>T° moyenne</th><th>Pluie / an</th><th>Jours gel / an</th><th>Jours 30°C+ / an</th><th>Jours 35°C+ / an</th></tr></thead>
+    <tbody>
+
+    <tr>
+      <td><strong>1990s</strong></td>
+      <td>12.15°C</td>
+      <td>643 mm</td>
+      <td>33.3j</td>
+      <td>8.4j</td>
+      <td>0.7j</td>
+    </tr>
+    <tr>
+      <td><strong>2000s</strong></td>
+      <td>12.33°C</td>
+      <td>669 mm</td>
+      <td>34.4j</td>
+      <td>11.0j</td>
+      <td>1.4j</td>
+    </tr>
+    <tr>
+      <td><strong>2010s</strong></td>
+      <td>12.54°C</td>
+      <td>679 mm</td>
+      <td>28.1j</td>
+      <td>11.2j</td>
+      <td>1.3j</td>
+    </tr>
+    <tr>
+      <td><strong>2020s</strong></td>
+      <td>12.92°C</td>
+      <td>744 mm</td>
+      <td>23.4j</td>
+      <td>17.7j</td>
+      <td>2.1j</td>
+    </tr></tbody></table></div>
+</main>
+<footer>
+  Données mises à jour le <span class="maj">2026-04-28</span>
+  · ERA5 + AROME + Tours-St-Symphorien · Période : 1990-01-01 → 2026-04-27
+  · <a href="clos_thierriere_climato.xlsx" style="color: var(--ocre);">Télécharger l'Excel</a>
+</footer>
+</body>
+</html>

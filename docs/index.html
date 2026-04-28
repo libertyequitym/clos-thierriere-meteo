@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Accueil — Clos Thierrière</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --vert-sauge: #536158;
+  --vert-sauge-clair: #6B7B71;
+  --vert-sauge-fonce: #3D4942;
+  --creme: #F5F1E8;
+  --creme-fonce: #E8E2D2;
+  --ocre: #D4A93B;
+  --bordeaux: #7A2E2E;
+  --noir-doux: #2A2A2A;
+  --gris: #8A857A;
+  --blanc: #FDFCF8;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 300;
+  background: var(--creme);
+  color: var(--noir-doux);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono { font-family: 'JetBrains Mono', 'Courier New', monospace; }
+
+a { color: var(--vert-sauge); text-decoration: none; border-bottom: 1px solid transparent; transition: all 0.2s; }
+a:hover { border-bottom-color: var(--vert-sauge); }
+
+/* HEADER */
+.header {
+  background: var(--vert-sauge);
+  color: var(--creme);
+  padding: 1rem 2rem;
+  border-bottom: 3px solid var(--ocre);
+}
+.header-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.logo {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+}
+.monogramme {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  background: var(--ocre);
+  color: var(--vert-sauge-fonce);
+  padding: 0.2rem 0.5rem;
+  border-radius: 2px;
+}
+.logo-titre { font-size: 1.1rem; font-weight: 400; letter-spacing: 0.05em; }
+.logo-soustitre { font-size: 0.75rem; opacity: 0.7; font-family: 'JetBrains Mono', monospace; }
+
+nav ul { list-style: none; display: flex; gap: 1.5rem; flex-wrap: wrap; }
+nav a {
+  color: var(--creme);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border-bottom: 1px solid transparent;
+}
+nav a:hover, nav a.active { border-bottom-color: var(--ocre); color: var(--ocre); }
+
+/* MAIN */
+main { max-width: 1200px; margin: 2rem auto; padding: 0 2rem; }
+.section { margin-bottom: 3rem; }
+.section-titre {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--vert-sauge);
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--vert-sauge);
+}
+h1 {
+  font-weight: 200;
+  font-size: 2.5rem;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.5rem;
+  color: var(--vert-sauge-fonce);
+}
+h2 {
+  font-weight: 300;
+  font-size: 1.5rem;
+  margin: 2rem 0 1rem;
+  color: var(--vert-sauge-fonce);
+}
+p { margin-bottom: 1rem; max-width: 70ch; }
+
+/* BANDEAU CHIFFRES-CLÉS */
+.bandeau-cles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  background: var(--blanc);
+  padding: 2rem;
+  border-radius: 4px;
+  border-left: 4px solid var(--ocre);
+  margin-bottom: 2rem;
+}
+.cle-bloc { text-align: center; padding: 0.5rem; }
+.cle-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--gris);
+  margin-bottom: 0.5rem;
+}
+.cle-valeur {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 2rem;
+  font-weight: 500;
+  color: var(--vert-sauge-fonce);
+  line-height: 1;
+}
+.cle-unite { font-size: 0.9rem; color: var(--gris); margin-left: 0.2rem; }
+
+/* CARTES */
+.cartes { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 1.5rem; }
+.carte {
+  background: var(--blanc);
+  padding: 1.5rem;
+  border-radius: 4px;
+  border-top: 3px solid var(--vert-sauge);
+}
+.carte h3 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--vert-sauge);
+  margin-bottom: 1rem;
+}
+.carte-valeur {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.8rem;
+  color: var(--vert-sauge-fonce);
+  margin-bottom: 0.5rem;
+}
+.carte-detail { font-size: 0.85rem; color: var(--gris); }
+
+/* TABLEAUX */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--blanc);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  margin: 1rem 0;
+}
+th {
+  background: var(--vert-sauge);
+  color: var(--creme);
+  padding: 0.7rem 1rem;
+  text-align: left;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.75rem;
+}
+td { padding: 0.6rem 1rem; border-bottom: 1px solid var(--creme-fonce); }
+tr:hover { background: var(--creme); }
+tr.highlight { background: rgba(212, 169, 59, 0.15); }
+
+/* BADGES */
+.badge {
+  display: inline-block;
+  padding: 0.2rem 0.7rem;
+  border-radius: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.badge-faible { background: #D4E5D9; color: #2D5A3D; }
+.badge-modere { background: #F2E4B8; color: #7A5C0E; }
+.badge-eleve { background: #F5C9A8; color: #8C4A1A; }
+.badge-tres-eleve { background: #F2B8B8; color: #7A2E2E; }
+.badge-info { background: var(--creme-fonce); color: var(--vert-sauge-fonce); }
+
+/* ALERTES */
+.alerte {
+  padding: 1rem 1.5rem;
+  border-radius: 4px;
+  margin: 1rem 0;
+  border-left: 4px solid;
+}
+.alerte-info { background: var(--blanc); border-left-color: var(--vert-sauge); }
+.alerte-attention { background: #FCF6E1; border-left-color: var(--ocre); }
+.alerte-danger { background: #F5DDDD; border-left-color: var(--bordeaux); color: var(--bordeaux); }
+
+/* CTA */
+.btn {
+  display: inline-block;
+  background: var(--vert-sauge);
+  color: var(--creme) !important;
+  padding: 0.8rem 1.5rem;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border: none;
+  transition: all 0.2s;
+}
+.btn:hover { background: var(--vert-sauge-fonce); border-bottom: none; }
+.btn-ocre { background: var(--ocre); color: var(--vert-sauge-fonce) !important; }
+.btn-ocre:hover { background: #B89230; }
+
+/* FOOTER */
+footer {
+  margin-top: 4rem;
+  padding: 2rem;
+  background: var(--vert-sauge-fonce);
+  color: var(--creme);
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+}
+footer .maj { color: var(--ocre); }
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .header-inner { flex-direction: column; align-items: flex-start; }
+  nav ul { flex-direction: column; gap: 0.5rem; }
+  h1 { font-size: 1.8rem; }
+  .cle-valeur { font-size: 1.5rem; }
+  main { padding: 0 1rem; }
+}
+
+/* GRAPHIQUES */
+.bar-chart { display: flex; flex-direction: column; gap: 0.3rem; margin: 1rem 0; }
+.bar-row { display: flex; align-items: center; gap: 0.5rem; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }
+.bar-label { width: 60px; color: var(--gris); }
+.bar-track { flex: 1; height: 16px; background: var(--creme-fonce); border-radius: 2px; overflow: hidden; position: relative; }
+.bar-fill { height: 100%; background: var(--vert-sauge); border-radius: 2px; transition: width 0.5s; }
+.bar-fill.chaud { background: var(--ocre); }
+.bar-fill.tres-chaud { background: var(--bordeaux); }
+.bar-value { width: 50px; text-align: right; color: var(--vert-sauge-fonce); }
+</style>
+</head>
+<body>
+<header class="header">
+  <div class="header-inner">
+    <div class="logo">
+      <span class="monogramme">CF</span>
+      <div>
+        <div class="logo-titre">Clos Thierrière</div>
+        <div class="logo-soustitre">Vouvray · Vernou-sur-Brenne</div>
+      </div>
+    </div>
+    <nav><ul><li><a href="index.html" class="active">Accueil</a></li><li><a href="millesime.html" class="">Millésime</a></li><li><a href="historique.html" class="">Historique</a></li><li><a href="risques.html" class="">Risques</a></li><li><a href="phenologie.html" class="">Phénologie</a></li><li><a href="methodologie.html" class="">Méthodologie</a></li></ul></nav>
+  </div>
+</header>
+<main>
+
+<div class="section">
+  <h1>Climat & vigne</h1>
+  <p style="font-size: 1.1rem; color: var(--gris); max-width: 600px;">
+    Suivi climatologique du domaine sur 35 ans. Mise à jour quotidienne automatique.
+    Sources : ERA5, AROME 1 km Météo-France, station officielle Tours-Saint-Symphorien.
+  </p>
+</div>
+
+<div class="section">
+  <div class="section-titre">État du domaine — 27 April 2026</div>
+  <div class="bandeau-cles">
+    <div class="cle-bloc">
+      <div class="cle-label">Température min</div>
+      <div class="cle-valeur">7.0<span class="cle-unite">°C</span></div>
+    </div>
+    <div class="cle-bloc">
+      <div class="cle-label">Température max</div>
+      <div class="cle-valeur">22.5<span class="cle-unite">°C</span></div>
+    </div>
+    <div class="cle-bloc">
+      <div class="cle-label">Précipitations</div>
+      <div class="cle-valeur">0.0<span class="cle-unite">mm</span></div>
+    </div>
+    <div class="cle-bloc">
+      <div class="cle-label">Réserve sol</div>
+      <div class="cle-valeur">13<span class="cle-unite">mm</span></div>
+    </div>
+    <div class="cle-bloc">
+      <div class="cle-label">Huglin 2026</div>
+      <div class="cle-valeur">186</div>
+    </div>
+    <div class="cle-bloc">
+      <div class="cle-label">Gel printanier</div>
+      <div class="cle-valeur">2<span class="cle-unite">j</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-titre">Risques sanitaires — 30 derniers jours</div>
+  <div class="cartes">
+    <div class="carte">
+      <h3>Mildiou</h3>
+      <div class="carte-valeur">0<span style="font-size: 1rem; color: var(--gris);"> jours à risque élevé</span></div>
+      <div class="carte-detail">Score Goidanich ≥ 3 sur 30 derniers jours</div>
+    </div>
+    <div class="carte">
+      <h3>Oïdium</h3>
+      <div class="carte-valeur">0<span style="font-size: 1rem; color: var(--gris);"> jours à risque élevé</span></div>
+      <div class="carte-detail">Score Gubler-Thomas ≥ 5 sur 30 derniers jours</div>
+    </div>
+    <div class="carte">
+      <h3>Botrytis</h3>
+      <div class="carte-valeur">0<span style="font-size: 1rem; color: var(--gris);"> jours à risque élevé</span></div>
+      <div class="carte-detail">Score combiné ≥ 3 sur 30 derniers jours</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-titre">Téléchargement</div>
+  <p>Toutes les données du domaine (35 ans, 13 onglets, indices viticoles experts) sont disponibles en un fichier Excel mis à jour chaque matin.</p>
+  <a href="clos_thierriere_climato.xlsx" class="btn btn-ocre">⬇ Télécharger l'Excel complet</a>
+</div>
+
+</main>
+<footer>
+  Données mises à jour le <span class="maj">2026-04-28</span>
+  · ERA5 + AROME + Tours-St-Symphorien · Période : 1990-01-01 → 2026-04-27
+  · <a href="clos_thierriere_climato.xlsx" style="color: var(--ocre);">Télécharger l'Excel</a>
+</footer>
+</body>
+</html>

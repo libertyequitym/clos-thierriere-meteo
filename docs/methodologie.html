@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Méthodologie — Clos Thierrière</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --vert-sauge: #536158;
+  --vert-sauge-clair: #6B7B71;
+  --vert-sauge-fonce: #3D4942;
+  --creme: #F5F1E8;
+  --creme-fonce: #E8E2D2;
+  --ocre: #D4A93B;
+  --bordeaux: #7A2E2E;
+  --noir-doux: #2A2A2A;
+  --gris: #8A857A;
+  --blanc: #FDFCF8;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 300;
+  background: var(--creme);
+  color: var(--noir-doux);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono { font-family: 'JetBrains Mono', 'Courier New', monospace; }
+
+a { color: var(--vert-sauge); text-decoration: none; border-bottom: 1px solid transparent; transition: all 0.2s; }
+a:hover { border-bottom-color: var(--vert-sauge); }
+
+/* HEADER */
+.header {
+  background: var(--vert-sauge);
+  color: var(--creme);
+  padding: 1rem 2rem;
+  border-bottom: 3px solid var(--ocre);
+}
+.header-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.logo {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+}
+.monogramme {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  background: var(--ocre);
+  color: var(--vert-sauge-fonce);
+  padding: 0.2rem 0.5rem;
+  border-radius: 2px;
+}
+.logo-titre { font-size: 1.1rem; font-weight: 400; letter-spacing: 0.05em; }
+.logo-soustitre { font-size: 0.75rem; opacity: 0.7; font-family: 'JetBrains Mono', monospace; }
+
+nav ul { list-style: none; display: flex; gap: 1.5rem; flex-wrap: wrap; }
+nav a {
+  color: var(--creme);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border-bottom: 1px solid transparent;
+}
+nav a:hover, nav a.active { border-bottom-color: var(--ocre); color: var(--ocre); }
+
+/* MAIN */
+main { max-width: 1200px; margin: 2rem auto; padding: 0 2rem; }
+.section { margin-bottom: 3rem; }
+.section-titre {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--vert-sauge);
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--vert-sauge);
+}
+h1 {
+  font-weight: 200;
+  font-size: 2.5rem;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.5rem;
+  color: var(--vert-sauge-fonce);
+}
+h2 {
+  font-weight: 300;
+  font-size: 1.5rem;
+  margin: 2rem 0 1rem;
+  color: var(--vert-sauge-fonce);
+}
+p { margin-bottom: 1rem; max-width: 70ch; }
+
+/* BANDEAU CHIFFRES-CLÉS */
+.bandeau-cles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  background: var(--blanc);
+  padding: 2rem;
+  border-radius: 4px;
+  border-left: 4px solid var(--ocre);
+  margin-bottom: 2rem;
+}
+.cle-bloc { text-align: center; padding: 0.5rem; }
+.cle-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--gris);
+  margin-bottom: 0.5rem;
+}
+.cle-valeur {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 2rem;
+  font-weight: 500;
+  color: var(--vert-sauge-fonce);
+  line-height: 1;
+}
+.cle-unite { font-size: 0.9rem; color: var(--gris); margin-left: 0.2rem; }
+
+/* CARTES */
+.cartes { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 1.5rem; }
+.carte {
+  background: var(--blanc);
+  padding: 1.5rem;
+  border-radius: 4px;
+  border-top: 3px solid var(--vert-sauge);
+}
+.carte h3 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--vert-sauge);
+  margin-bottom: 1rem;
+}
+.carte-valeur {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.8rem;
+  color: var(--vert-sauge-fonce);
+  margin-bottom: 0.5rem;
+}
+.carte-detail { font-size: 0.85rem; color: var(--gris); }
+
+/* TABLEAUX */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--blanc);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  margin: 1rem 0;
+}
+th {
+  background: var(--vert-sauge);
+  color: var(--creme);
+  padding: 0.7rem 1rem;
+  text-align: left;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.75rem;
+}
+td { padding: 0.6rem 1rem; border-bottom: 1px solid var(--creme-fonce); }
+tr:hover { background: var(--creme); }
+tr.highlight { background: rgba(212, 169, 59, 0.15); }
+
+/* BADGES */
+.badge {
+  display: inline-block;
+  padding: 0.2rem 0.7rem;
+  border-radius: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.badge-faible { background: #D4E5D9; color: #2D5A3D; }
+.badge-modere { background: #F2E4B8; color: #7A5C0E; }
+.badge-eleve { background: #F5C9A8; color: #8C4A1A; }
+.badge-tres-eleve { background: #F2B8B8; color: #7A2E2E; }
+.badge-info { background: var(--creme-fonce); color: var(--vert-sauge-fonce); }
+
+/* ALERTES */
+.alerte {
+  padding: 1rem 1.5rem;
+  border-radius: 4px;
+  margin: 1rem 0;
+  border-left: 4px solid;
+}
+.alerte-info { background: var(--blanc); border-left-color: var(--vert-sauge); }
+.alerte-attention { background: #FCF6E1; border-left-color: var(--ocre); }
+.alerte-danger { background: #F5DDDD; border-left-color: var(--bordeaux); color: var(--bordeaux); }
+
+/* CTA */
+.btn {
+  display: inline-block;
+  background: var(--vert-sauge);
+  color: var(--creme) !important;
+  padding: 0.8rem 1.5rem;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border: none;
+  transition: all 0.2s;
+}
+.btn:hover { background: var(--vert-sauge-fonce); border-bottom: none; }
+.btn-ocre { background: var(--ocre); color: var(--vert-sauge-fonce) !important; }
+.btn-ocre:hover { background: #B89230; }
+
+/* FOOTER */
+footer {
+  margin-top: 4rem;
+  padding: 2rem;
+  background: var(--vert-sauge-fonce);
+  color: var(--creme);
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+}
+footer .maj { color: var(--ocre); }
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .header-inner { flex-direction: column; align-items: flex-start; }
+  nav ul { flex-direction: column; gap: 0.5rem; }
+  h1 { font-size: 1.8rem; }
+  .cle-valeur { font-size: 1.5rem; }
+  main { padding: 0 1rem; }
+}
+
+/* GRAPHIQUES */
+.bar-chart { display: flex; flex-direction: column; gap: 0.3rem; margin: 1rem 0; }
+.bar-row { display: flex; align-items: center; gap: 0.5rem; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }
+.bar-label { width: 60px; color: var(--gris); }
+.bar-track { flex: 1; height: 16px; background: var(--creme-fonce); border-radius: 2px; overflow: hidden; position: relative; }
+.bar-fill { height: 100%; background: var(--vert-sauge); border-radius: 2px; transition: width 0.5s; }
+.bar-fill.chaud { background: var(--ocre); }
+.bar-fill.tres-chaud { background: var(--bordeaux); }
+.bar-value { width: 50px; text-align: right; color: var(--vert-sauge-fonce); }
+</style>
+</head>
+<body>
+<header class="header">
+  <div class="header-inner">
+    <div class="logo">
+      <span class="monogramme">CF</span>
+      <div>
+        <div class="logo-titre">Clos Thierrière</div>
+        <div class="logo-soustitre">Vouvray · Vernou-sur-Brenne</div>
+      </div>
+    </div>
+    <nav><ul><li><a href="index.html" class="">Accueil</a></li><li><a href="millesime.html" class="">Millésime</a></li><li><a href="historique.html" class="">Historique</a></li><li><a href="risques.html" class="">Risques</a></li><li><a href="phenologie.html" class="">Phénologie</a></li><li><a href="methodologie.html" class="active">Méthodologie</a></li></ul></nav>
+  </div>
+</header>
+<main>
+
+<div class="section">
+  <h1>Méthodologie</h1>
+  <p>Sources de données, formules des indices viticoles, calibration de la correction gel.</p>
+</div>
+
+<div class="section">
+  <div class="section-titre">Sources de données</div>
+  <div class="cartes">
+    <div class="carte">
+      <h3>1990 → 2020</h3>
+      <p><strong>ERA5</strong> (Copernicus / ECMWF)</p>
+      <div class="carte-detail">Réanalyse climatique mondiale, résolution 9 km. Référence scientifique homogène sur toute la période.</div>
+    </div>
+    <div class="carte">
+      <h3>2021 → aujourd'hui</h3>
+      <p><strong>AROME 1 km</strong> (Météo-France)</p>
+      <div class="carte-detail">Modèle haute résolution opérationnel. Très précis sur températures moyennes et pluies.</div>
+    </div>
+    <div class="carte">
+      <h3>Validation observée</h3>
+      <p><strong>Tours-Saint-Symphorien</strong> (DPClim Météo-France)</p>
+      <div class="carte-detail">Station officielle, ~11 km du Clos. Données mesurées, valeur juridique.</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-titre">Calibration de la correction gel</div>
+  <p>La correction "cuvette" appliquée à la T_min du modèle AROME pour estimer le risque gel parcellaire est calibrée empiriquement sur le delta moyen entre la station Tours et le modèle AROME, par type de nuit.</p>
+  
+  <div class="alerte alerte-info">
+    <strong>Valeurs calibrées (à la dernière exécution) :</strong>
+    <ul style="margin-top: 0.5rem; list-style: none; padding-left: 0;">
+      <li class="mono">→ Nuit ventée (vent > 25 km/h) : <strong>-0.27°C</strong></li>
+      <li class="mono">→ Nuit calme et sèche (vent < 12 km/h, HR < 85%) : <strong>-0.93°C</strong></li>
+      <li class="mono">→ Nuit intermédiaire : <strong>-0.67°C</strong></li>
+    </ul>
+  </div>
+  
+  <h2>Limites importantes</h2>
+  <div class="alerte alerte-attention">
+    <strong>Limite n°1 — Tours est en plaine.</strong> Le delta capture l'écart Tours-Vernou, pas l'effet cuvette du Clos. La T_min ajustée sous-estime probablement encore le vrai gel parcellaire en fond de cuvette.
+  </div>
+  <div class="alerte alerte-attention">
+    <strong>Limite n°2 — Pas de calibration parcellaire.</strong> Aucune mesure réelle au Clos n'existe. Une station physique au domaine permettrait un calibrage fin.
+  </div>
+  <div class="alerte alerte-attention">
+    <strong>Limite n°3 — Référence avril 2021.</strong> Tours a mesuré -2.0°C. AROME : -1.0°C. Notre ajusté : -2.5°C. Réalité dans certaines parcelles de Vouvray : -4 à -6°C en fond de vallon.
+  </div>
+  
+  <h2>Lecture des 3 compteurs gel</h2>
+  <div class="cartes">
+    <div class="carte">
+      <h3>Jours_gel_modele</h3>
+      <p>Donnée brute AROME au point centroïde.</p>
+      <div class="carte-detail" style="color: var(--bordeaux);">⚠ Sous-estime systématiquement. Ne pas utiliser seul pour le pilotage.</div>
+    </div>
+    <div class="carte">
+      <h3>Jours_gel_ajuste</h3>
+      <p>Donnée brute + correction calibrée.</p>
+      <div class="carte-detail">Compteur principal pour le pilotage parcellaire.</div>
+    </div>
+    <div class="carte">
+      <h3>Jours_gel_observe_tours</h3>
+      <p>Mesure officielle Tours-St-Symphorien.</p>
+      <div class="carte-detail">Donnée juridiquement opposable en cas de sinistre.</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-titre">Tous les indices calculés</div>
+  <p style="color: var(--gris); margin-bottom: 1.5rem;">Pour chaque indicateur : formule, période de calcul, interprétation viticole et limites.</p>
+  
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3>INDICES THERMIQUES</h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> </p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;"></p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3>Indice Huglin (IH)</h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            Σ [(Tmoy-10) + (Tmax-10)] / 2 × K_lat
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> 01/04 → 30/09</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> Caractérise le potentiel héliothermique pour la maturité du raisin. Mesure thermique adaptée à la latitude.</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> Très frais <1500 / Frais 1500-1800 / Tempéré 1800-2100 / Tempéré chaud 2100-2400 / Chaud 2400-3000 / Très chaud >3000</p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;">Huglin (1978). K_lat = 1.05 à 47.43°N. Référence pour la viticulture mondiale (système Tonietto).</p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3>Indice Winkler (GDD)</h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            Σ max(0, Tmoy - 10)
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> 01/04 → 31/10</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> Somme des degrés-jours utiles à la vigne. Bien corrélé avec phénologie et teneur en sucre.</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> Région I <850 (très frais) / II 850-1389 (frais) / III 1389-1667 (tempéré) / IV 1667-1944 (chaud) / V 1944-2222 (très chaud)</p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;">Amerine & Winkler (1944, UC Davis). Standard américain. Pour Vouvray/Chenin, optimum en Région II-III.</p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3>Indice Fraîcheur des Nuits (IF)</h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            Moyenne des Tmin de septembre
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> Septembre</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> Caractérise les nuits de maturation. Détermine le potentiel aromatique et la conservation des acides.</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> Très fraîches ≤12°C / Fraîches 12-14°C / Tempérées 14-18°C / Chaudes >18°C</p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;">Tonietto (1999). Pour Chenin, optimum en nuits fraîches à tempérées.</p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3>GFV Parker</h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            Σ Tmoy base 0°C depuis 01/01
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> 01/01 → date stade</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> Modèle phénologique : prédit les dates clés (1500°C·j ≈ floraison, 2700°C·j ≈ véraison).</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> À comparer aux dates observées en Phénologie_terrain pour calibration</p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;">Parker et al. (2011, 2013). À recalibrer pour Chenin sur Vouvray spécifiquement.</p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3>GSR</h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            Σ Tmoy base 0°C de la véraison à la maturité
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> Véraison → maturité</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> Modèle phénologique de la maturation : prédit la date de récolte selon le seuil cépage.</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> Seuil maturité Chenin ~ 3300-3500°C·j</p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;">Parker et al. (2014)</p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3>BBCH base 5°C</h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            Σ max(0, Tmoy - 5)
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> 01/01 → date stade</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> Modèle de débourrement (stade BBCH 09/13). Seuil ~ 200-250°C·j pour Chenin.</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> À calibrer terrain</p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;">Méthode commune ITV/Chambres d'agriculture</p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3></h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> </p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;"></p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3>INDICES HYDRIQUES</h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> </p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;"></p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3>ETP FAO Penman-Monteith</h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            Calculée par Open-Meteo selon norme FAO-56
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> Quotidien</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> Évapotranspiration potentielle du couvert végétal de référence. Mesure la demande climatique en eau.</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> Normales 600-750 mm sur la campagne avr-sept à Vouvray</p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;">FAO-56 (1998), Allen et al.</p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3>Bilan hydrique campagne</h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            Σ Pluies − Σ ETP
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> 01/04 → 30/09</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> Différence entre apports et demande. Indique les conditions hydriques de la saison.</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> Sain >0 / Léger stress -100 à 0 / Stress -300 à -100 / Sec sévère <-300</p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;">Riou (1994). Indicateur OIV de référence.</p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3>Indice Selianinov</h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            (Σ Pluies campagne / Winkler) × 10
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> 01/04 → 30/09</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> Efficacité hydrique des précipitations rapportée à la chaleur.</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> <2 sec / 2-3 modéré / >3 humide</p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;">Selianinov (1937)</p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3>RFU (Réserve Facilement Utilisable)</h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            RFU(j) = min(150, max(0, RFU(j-1) + RR(j) - ETP(j)))
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> Quotidien</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> Modèle de bilan hydrique simple du sol. Approximation : 150mm pour sols argilo-calcaires Vouvray.</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> Sévère <30mm / Modéré 30-60 / Léger 60-100 / Aucun stress >100</p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;">Modèle FAO simplifié. À affiner avec mesures sondes parcellaires.</p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3></h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> </p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;"></p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3>RISQUES SANITAIRES</h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> </p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;"></p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3>Mildiou (Goidanich simplifié)</h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            Score = (T 10-25°C) + (RR 48h ≥10mm) + (HR ≥75%)
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> Quotidien</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> Indice de risque épidémiologique mildiou. Score ≥3 = conditions très favorables.</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> Nul=0 / Faible=1 / Modéré=2 / Élevé=3</p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;">Goidanich (1962). Version pleinement détaillée nécessite la modélisation des œufs d'hiver et générations.</p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3>Oïdium (Gubler-Thomas)</h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            Σ jours favorables (T 21-30°C, HR ≥60%) sur 7 jours glissants
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> Quotidien</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> Score basé sur l'accumulation de conditions favorables au champignon.</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> Faible 0-2 / Modéré 3-4 / Élevé 5-6 / Très élevé 7</p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;">Gubler & Thomas (1995, UC Davis)</p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3>Botrytis pré-vendange</h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            Score = 2×(HR≥80) + 2×(RR_7j≥30) + (T 15-22°C)
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> Quotidien, focus août-vendanges</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> Risque pourriture grise. Critique pendant la maturation et avant vendange.</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> Faible 0-1 / Modéré 2 / Élevé 3 / Très élevé 4-5</p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;">Modèle simplifié inspiré Broome et al.</p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3>Échaudage</h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            Tmax ≥ 35°C ET RFU < 60mm
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> Été</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> Combinaison canicule + stress hydrique = brûlures sur grappes.</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> Compteur jours/an</p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;">Indicateur empirique IFV</p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3>Fenêtre traitement OK</h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            RR<1mm ce jour ET RR<2mm demain ET vent<30km/h ET HR<85%
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> Quotidien</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> Conditions favorables à un traitement (efficacité du produit, sécurité d'application).</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> Compteur jours/mois pour planification</p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;"></p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3></h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> </p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;"></p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3>INDICES QUALITÉ MILLÉSIME</h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> </p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;"></p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3>Amplitude thermique d'août</h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            Tmax − Tmin moyenne sur août
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> Août</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> Critique pour le développement aromatique du Chenin (réfrigération nocturne).</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> Idéal >12°C pour expression aromatique fine</p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;">Pratique vigneron classique</p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3>Jours idéaux maturation</h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            Tmax 22-28°C ET Tmin 12-18°C ET sec, en août-sept
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> Août-Septembre</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> Conditions optimales pour la maturation lente et qualitative.</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> Compteur — un millésime équilibré en a 15-25</p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;"></p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3>Jours idéaux vendange</h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            Tmoy 15-22°C ET sec ET HR matin élevée
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> Septembre-Octobre</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> Fenêtres optimales pour vendanger en main d'œuvre et préserver la fraîcheur.</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> Compteur</p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;"></p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3></h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> </p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;"></p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3>GEL — VERSIONS BRUTE / AJUSTÉE / OBSERVÉE</h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> </p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;"></p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3>Jour_gel_modele</h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            T_min AROME ≤ 0°C
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> Quotidien</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> Donnée brute du modèle au point centroïde du domaine (1 km²).</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> Compteur jours/an et jours/printemps</p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;">ATTENTION : sous-estime systématiquement les gels radiatifs en cuvette (~1-3°C de différence avec le fond de vallon par nuit calme et claire). Ne pas utiliser seul pour le pilotage parcellaire.</p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3>Jour_gel_ajuste</h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            T_min ajustée ≤ 0°C, où T_min ajustée = T_min AROME + correction calibrée
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> Quotidien</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> Estimation prudente du risque pour le contexte parcellaire du Clos. La correction est calibrée empiriquement sur le delta Tours-AROME observé sur 35 ans, par type de nuit (ventée / calme et sèche / intermédiaire).</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> Compteur jours/an et jours/printemps. À utiliser comme référence de pilotage.</p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;">Limites : Tours est à 11 km en plaine, donc le delta calibré sous-estime probablement encore le vrai delta cuvette du Clos. Une station physique au domaine permettrait un calibrage parcellaire.</p>
+        </div>
+        
+        <div class="carte" style="margin-bottom: 1rem; border-top: 2px solid var(--ocre);">
+          <h3>Jour_gel_observe_tours</h3>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--vert-sauge); background: var(--creme); padding: 0.5rem; border-radius: 2px; margin-bottom: 0.8rem;">
+            T_min Tours-St-Symphorien ≤ 0°C (mesurée)
+          </p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Période :</strong> Quotidien</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Interprétation :</strong> Mesure officielle Météo-France à 11 km du domaine, station synoptique de Parçay-Meslay (alt 108 m). Vérité observée mais à 11 km de distance.</p>
+          <p style="font-size: 0.95rem; margin-bottom: 0.5rem;"><strong>Classes / Seuils :</strong> Compteur — donnée juridiquement opposable en cas de sinistre</p>
+          <p style="font-size: 0.85rem; color: var(--gris); font-style: italic;">Tours est en plaine et plus à l'ouest. Vouvray (coteaux) peut connaître des gels que Tours ne capte pas, ou inversement. Donnée valable pour la tendance régionale, pas pour le détail parcellaire.</p>
+        </div>
+        
+</div>
+
+</main>
+<footer>
+  Données mises à jour le <span class="maj">2026-04-28</span>
+  · ERA5 + AROME + Tours-St-Symphorien · Période : 1990-01-01 → 2026-04-27
+  · <a href="clos_thierriere_climato.xlsx" style="color: var(--ocre);">Télécharger l'Excel</a>
+</footer>
+</body>
+</html>
