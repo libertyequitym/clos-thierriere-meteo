@@ -45,16 +45,19 @@ NORMALE_FIN = 2020
 TOURS_STATION_ID = "37179001"  # ID DPClim
 METEOFRANCE_API_KEY = os.environ.get("METEOFRANCE_API_KEY", "")
 
-# Ajustement empirique cuvette (correction inversion thermique)
-# Nuit calme & claire → -2.5°C, nuit ventée → -0.5°C, intermédiaire → -1.5°C
-def correction_cuvette(t_min, vent_max_kmh, hr_moy):
+# Catégorisation d'une nuit selon les conditions météo
+# Sert à appliquer une correction cuvette calibrée sur des données réelles
+def categorie_nuit(vent_max_kmh, hr_moy):
     if vent_max_kmh is None or hr_moy is None:
-        return -1.5
+        return "intermediaire"
     if vent_max_kmh > 25:
-        return -0.5
-    if vent_max_kmh < 12 and (hr_moy < 85):
-        return -2.5
-    return -1.5
+        return "ventee"
+    if vent_max_kmh < 12 and hr_moy < 85:
+        return "calme_seche"
+    return "intermediaire"
+
+# Les corrections seront calibrées dynamiquement sur les données Tours
+# (calcul fait après la fusion Tours/AROME, dans la section 6)
 
 print(f"Robot météo — {NOM_DOMAINE}")
 print(f"Position : {LATITUDE}°N, {LONGITUDE}°E")
@@ -335,11 +338,13 @@ df["Jour"] = df["Date"].dt.day
 df["Jour_julien"] = df["Date"].dt.dayofyear
 df["Semaine_ISO"] = df["Date"].dt.isocalendar().week.astype(int)
 
-# T_min ajustée cuvette (A.2)
-df["Correction_cuvette"] = df.apply(
-    lambda r: correction_cuvette(r["T_min"], r["Vent_max_kmh"], r["HR_moy"]), axis=1
-).round(2)
-df["T_min_ajustee"] = (df["T_min"] + df["Correction_cuvette"]).round(2)
+# Catégorisation des nuits
+df["Categorie_nuit"] = df.apply(
+    lambda r: categorie_nuit(r["Vent_max_kmh"], r["HR_moy"]), axis=1
+)
+# Initialisation : T_min_ajustee = T_min en attendant la calibration
+df["T_min_ajustee"] = df["T_min"]
+df["Correction_cuvette"] = 0.0
 
 # Compteurs gel : VERSION MODÈLE (brute)
 df["Jour_gel_modele"] = (df["T_min"] <= 0).astype(int)
@@ -382,6 +387,48 @@ else:
     df["RR_obs"] = None
     df["Jour_gel_observe"] = 0
     print("  Pas de données Tours à fusionner")
+  # =============================================================================
+# 6 bis — CALIBRATION EMPIRIQUE DE LA CORRECTION CUVETTE
+# =============================================================================
+# Méthode : on calcule pour chaque type de nuit (ventée / calme et sèche / intermédiaire)
+# le delta moyen entre la mesure observée Tours-St-Symphorien et le modèle AROME au
+# point de Vernou. Ce delta sert ensuite de correction empirique appliquée à T_min.
+#
+# Limite assumée : Tours est en plaine à 11 km, donc le delta capture surtout
+# la différence d'altitude/exposition entre Tours et la maille AROME de Vernou,
+# pas exactement la cuvette du Clos. Une station physique au domaine permettra
+# une vraie calibration parcellaire.
+
+print("ÉTAPE 3 bis/7 — Calibration empirique correction cuvette")
+
+corrections_calibrees = {"ventee": -1.5, "calme_seche": -1.5, "intermediaire": -1.5}  # défaut prudent
+
+if "T_min_obs" in df.columns and df["T_min_obs"].notna().sum() > 100:
+    masque_calib = df["T_min_obs"].notna() & df["T_min"].notna()
+    df_calib = df[masque_calib].copy()
+    df_calib["delta"] = df_calib["T_min_obs"] - df_calib["T_min"]
+    # Calcul du delta moyen par catégorie
+    for cat in ["ventee", "calme_seche", "intermediaire"]:
+        sub = df_calib[df_calib["Categorie_nuit"] == cat]
+        if len(sub) > 30:
+            delta_moy = sub["delta"].mean()
+            corrections_calibrees[cat] = round(delta_moy, 2)
+            print(f"  {cat:<15} : {len(sub)} nuits, delta moyen Tours-AROME = {delta_moy:+.2f}°C")
+        else:
+            print(f"  {cat:<15} : trop peu de données ({len(sub)} nuits), correction par défaut")
+    print(f"  Corrections calibrées appliquées : {corrections_calibrees}")
+else:
+    print("  Pas assez de données Tours pour calibrer — corrections par défaut utilisées")
+
+# Application des corrections calibrées
+df["Correction_cuvette"] = df["Categorie_nuit"].map(corrections_calibrees).round(2)
+df["T_min_ajustee"] = (df["T_min"] + df["Correction_cuvette"]).round(2)
+
+# Recalcul des compteurs gel ajustés (après application de la correction calibrée)
+df["Jour_gel_ajuste"] = (df["T_min_ajustee"] <= 0).astype(int)
+df["Jour_gel_severe_ajuste"] = (df["T_min_ajustee"] <= -2).astype(int)
+df["Gel_printanier_ajuste"] = ((df["Mois"].isin([3, 4, 5])) & (df["T_min_ajustee"] <= 0)).astype(int)
+df["Gel_printanier_severe_ajuste"] = ((df["Mois"].isin([3, 4, 5])) & (df["T_min_ajustee"] <= -2)).astype(int)
 
 # =============================================================================
 # 7. INDICES VITICOLES JOURNALIERS
@@ -663,12 +710,15 @@ readme_data = [
     ["Nombre d'années", str(df["Annee"].nunique()), "", ""],
     ["Normales climatiques", f"{NORMALE_DEBUT}-{NORMALE_FIN}", "Standard OMM (Org. Météorologique Mondiale)", "Période de référence sur 30 ans pour comparer chaque année"],
     ["", "", "", ""],
-    ["AJUSTEMENT GEL CLOS", "", "", ""],
-    ["Principe", "T_min ajustée = T_min modèle + Correction cuvette", "Correction empirique pour effet de cuvette/inversion thermique", "Le Clos est en partie en zone abritée du vent → nuits radiatives plus froides que la moyenne maille 1km"],
-    ["Nuit ventée (vent > 25 km/h)", "Correction = -0.5°C", "Brassage limite l'inversion thermique", ""],
-    ["Nuit calme et sèche (vent < 12 km/h, HR < 85%)", "Correction = -2.5°C", "Conditions favorables à l'inversion thermique forte", "C'est dans ces conditions que le gel localisé est le plus marqué"],
-    ["Nuit intermédiaire", "Correction = -1.5°C", "Cas par défaut", ""],
-    ["Référence biblio", "Inspiré méthodologie AgroMetInfo INRAE", "", "À calibrer si une station physique est installée au Clos"],
+    ["AJUSTEMENT GEL CLOS — méthodologie", "", "", ""],
+    ["Principe physique", "Inversion thermique nocturne", "L'air froid descend dans les cuvettes par nuit calme et claire", "Phénomène bien documenté en agrométéo (manuels INRAE, Quénol, Bonnardot)"],
+    ["Méthode appliquée", "Correction empirique calibrée sur deltas Tours-AROME", "À chaque exécution, le robot calcule la différence moyenne Tours-AROME pour chaque type de nuit et applique cette correction au modèle AROME", "Calibration automatique sur 35 ans de données (~13 000 nuits)"],
+    ["Catégorisation des nuits", "Ventée / Calme et sèche / Intermédiaire", "Vent > 25 km/h = ventée. Vent < 12 km/h ET HR < 85% = calme et sèche. Sinon intermédiaire.", "Critères empiriques inspirés des typologies agroclimatiques classiques"],
+    ["Corrections appliquées (à date d'exécution)", f"Ventée {corrections_calibrees.get('ventee', -1.5):+.2f}°C / Calme et sèche {corrections_calibrees.get('calme_seche', -1.5):+.2f}°C / Intermédiaire {corrections_calibrees.get('intermediaire', -1.5):+.2f}°C", "Valeurs recalculées à chaque mise à jour à partir des deltas observés", ""],
+    ["Limite assumée n°1", "Tours-St-Symphorien est à 11 km en plaine", "Le delta Tours-AROME capture surtout la différence Tours/maille Vernou, pas exactement la cuvette du Clos. Le vrai gel parcellaire peut être plus marqué encore (jusqu'à -2 à -4°C supplémentaires en fond de cuvette).", "Pour information : le gel d'avril 2021 a vu localement -4 à -6°C dans certaines parcelles de Vouvray, alors que Tours mesurait -2°C."],
+    ["Limite assumée n°2", "Aucune mesure réelle au domaine", "Les corrections sont des estimations empiriques. Pour avoir la vérité parcellaire au degré près, une station physique au Clos (Sencrop ~700€/an) est nécessaire.", "À envisager pour une calibration parcellaire fiable."],
+    ["Lecture pratique", "T_min_ajustee = estimation prudente du risque", "Compteur 'Jours_gel_ajuste' = utiliser pour le pilotage. Compteur 'Jours_gel_observe_tours' = donnée officielle. Compteur 'Jours_gel_modele' = donnée brute du modèle, sous-estime le risque parcellaire.", ""],
+    ["Référence", "Méthodologie inspirée du delta-correction utilisé en climatologie agricole", "", "Approche transparente sans calibration spécifique au Clos à ce jour"],
     ["", "", "", ""],
     ["GOOGLE SHEET — Saisies terrain", "", "", ""],
     ["Lien d'accès", f"https://docs.google.com/spreadsheets/d/{GSHEET_ID}", "URL publique en lecture, édition réservée", "Ajouter les frères Frey en éditeurs pour saisie"],
@@ -760,18 +810,18 @@ methodologie_data = [
      ""],
     ["", "", "", "", "", ""],
     ["GEL — VERSIONS BRUTE / AJUSTÉE / OBSERVÉE", "", "", "", "", ""],
-    ["Jour_gel_modele", "Tmin_AROME ≤ 0°C", "Quotidien",
-     "Donnée brute du modèle au point centroïde du domaine.",
-     "Compteur",
-     "ATTENTION : sous-estime les gels radiatifs en cuvette (~1-2°C)"],
-    ["Jour_gel_ajuste", "Tmin ajustée ≤ 0°C avec correction cuvette", "Quotidien",
-     "Estimation réaliste pour le contexte parcellaire du Clos.",
-     "Compteur",
-     "Modèle empirique. À valider avec station physique au domaine."],
-    ["Jour_gel_observe_tours", "Tmin_Tours ≤ 0°C (mesurée)", "Quotidien",
-     "Mesure officielle Météo-France à 11 km du domaine.",
-     "Compteur",
-     "Donnée juridiquement opposable. Tours est en plaine : peut différer de Vouvray (coteaux)."],
+    ["Jour_gel_modele", "T_min AROME ≤ 0°C", "Quotidien",
+     "Donnée brute du modèle au point centroïde du domaine (1 km²).",
+     "Compteur jours/an et jours/printemps",
+     "ATTENTION : sous-estime systématiquement les gels radiatifs en cuvette (~1-3°C de différence avec le fond de vallon par nuit calme et claire). Ne pas utiliser seul pour le pilotage parcellaire."],
+    ["Jour_gel_ajuste", "T_min ajustée ≤ 0°C, où T_min ajustée = T_min AROME + correction calibrée", "Quotidien",
+     "Estimation prudente du risque pour le contexte parcellaire du Clos. La correction est calibrée empiriquement sur le delta Tours-AROME observé sur 35 ans, par type de nuit (ventée / calme et sèche / intermédiaire).",
+     "Compteur jours/an et jours/printemps. À utiliser comme référence de pilotage.",
+     "Limites : Tours est à 11 km en plaine, donc le delta calibré sous-estime probablement encore le vrai delta cuvette du Clos. Une station physique au domaine permettrait un calibrage parcellaire."],
+    ["Jour_gel_observe_tours", "T_min Tours-St-Symphorien ≤ 0°C (mesurée)", "Quotidien",
+     "Mesure officielle Météo-France à 11 km du domaine, station synoptique de Parçay-Meslay (alt 108 m). Vérité observée mais à 11 km de distance.",
+     "Compteur — donnée juridiquement opposable en cas de sinistre",
+     "Tours est en plaine et plus à l'ouest. Vouvray (coteaux) peut connaître des gels que Tours ne capte pas, ou inversement. Donnée valable pour la tendance régionale, pas pour le détail parcellaire."],
 ]
 df_methodologie = pd.DataFrame(methodologie_data, columns=[
     "Indicateur", "Formule", "Période de calcul", "Interprétation viticole",
